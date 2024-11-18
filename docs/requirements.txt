@@ -1,0 +1,12 @@
+jax
+torch
+sphinx
+nvidia-sphinx-theme
+autodocsumm
+myst-parser
+ipykernel
+matplotlib
+jupyter-sphinx
+python-gitlab
+e3nn
+flax
