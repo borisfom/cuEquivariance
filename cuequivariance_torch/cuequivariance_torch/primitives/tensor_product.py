@@ -88,6 +88,9 @@ class TensorProduct(torch.nn.Module):
         Raises:
             RuntimeError: If `use_fallback` is `False` and either no CUDA kernel is available or the input tensor is not on CUDA.
         """
+        if any(x.numel() == 0 for x in args):
+            use_fallback = True  # Empty tensors are not supported by the CUDA kernel
+
         if (
             args
             and args[0].device.type == "cuda"
@@ -285,7 +288,7 @@ class _Wrapper(torch.nn.Module):
                     (math.prod(shape), arg.shape[-1])
                 )
                 if math.prod(arg.shape[:-1]) > 1
-                else arg.reshape((1, arg.shape[-1]))
+                else arg.reshape((math.prod(arg.shape[:-1]), arg.shape[-1]))
             )
             for arg in args
         ]
