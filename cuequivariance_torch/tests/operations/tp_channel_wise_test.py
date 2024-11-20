@@ -20,7 +20,7 @@ import cuequivariance_torch as cuet
 from cuequivariance import descriptors
 
 list_of_irreps = [
-    cue.Irreps("O3", "4x0e + 4x1o"),
+    cue.Irreps("O3", "32x0e + 32x1o"),
     cue.Irreps("O3", "2x1o + 5x0e + 2e + 1e + 1o"),
     cue.Irreps("O3", "2e + 0x0e + 0o + 0x1e + 1e"),
 ]
