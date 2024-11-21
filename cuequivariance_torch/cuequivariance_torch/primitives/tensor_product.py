@@ -15,7 +15,7 @@
 import logging
 import math
 import warnings
-from typing import *
+from typing import Optional, OrderedDict, Tuple
 
 import torch
 import torch.fx
