@@ -57,6 +57,12 @@ class TensorProduct(torch.nn.Module):
             self.f_cuda = None
         except ImportError as e:
             logger.warning(f"CUDA implementation not available: {e}")
+            logger.warning(
+                "Did you forget to install the CUDA version of cuequivariance-ops-torch?\n"
+                "Install it with one of the following commands:\n"
+                "pip install cuequivariance-ops-torch-cu11\n"
+                "pip install cuequivariance-ops-torch-cu12"
+            )
             self.f_cuda = None
 
         self.f_fx = _tensor_product_fx(
