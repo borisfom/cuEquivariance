@@ -443,12 +443,10 @@ class FusedTensorProductOp3(torch.nn.Module):
         self,
         x0: torch.Tensor,
         x1: torch.Tensor,
-        b2: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         x0, x1 = self._perm(x0, x1)
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
-        assert b2 is None
 
         shape = torch.broadcast_shapes(x0.shape[:-1], x1.shape[:-1])
         x0 = _reshape(x0, shape)
@@ -504,13 +502,11 @@ class FusedTensorProductOp4(torch.nn.Module):
         x0: torch.Tensor,
         x1: torch.Tensor,
         x2: torch.Tensor,
-        b3: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         x0, x1, x2 = self._perm(x0, x1, x2)
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
         assert x2.ndim >= 1, x2.ndim
-        assert b3 is None
 
         shape = torch.broadcast_shapes(x0.shape[:-1], x1.shape[:-1], x2.shape[:-1])
         x0 = _reshape(x0, shape)
