@@ -20,7 +20,7 @@ import cuequivariance_torch as cuet
 from cuequivariance import descriptors
 
 list_of_irreps = [
-    cue.Irreps("O3", "4x0e + 4x1o"),
+    cue.Irreps("O3", "32x0e + 32x1o"),
     cue.Irreps("O3", "2x1o + 5x0e + 2e + 1e + 1o"),
     cue.Irreps("O3", "2e + 0x0e + 0o + 0x1e + 1e"),
 ]
@@ -31,12 +31,14 @@ list_of_irreps = [
 @pytest.mark.parametrize("irreps3", list_of_irreps)
 @pytest.mark.parametrize("layout", [cue.ir_mul, cue.mul_ir])
 @pytest.mark.parametrize("use_fallback", [False, True])
+@pytest.mark.parametrize("batch", [0, 32])
 def test_channel_wise(
     irreps1: cue.Irreps,
     irreps2: cue.Irreps,
     irreps3: cue.Irreps,
     layout: cue.IrrepsLayout,
     use_fallback: bool,
+    batch: int,
 ):
     m = cuet.ChannelWiseTensorProduct(
         irreps1,
@@ -49,8 +51,8 @@ def test_channel_wise(
         dtype=torch.float64,
     )
 
-    x1 = torch.randn(32, irreps1.dim, dtype=torch.float64).cuda()
-    x2 = torch.randn(32, irreps2.dim, dtype=torch.float64).cuda()
+    x1 = torch.randn(batch, irreps1.dim, dtype=torch.float64).cuda()
+    x2 = torch.randn(batch, irreps2.dim, dtype=torch.float64).cuda()
 
     out1 = m(x1, x2, use_fallback=use_fallback)
 

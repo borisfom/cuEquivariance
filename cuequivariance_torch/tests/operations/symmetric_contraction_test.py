@@ -30,7 +30,8 @@ torch.backends.cudnn.allow_tf32 = USE_TF32
 @pytest.mark.parametrize("dtype", [torch.float64, torch.float32])
 @pytest.mark.parametrize("layout", [cue.ir_mul, cue.mul_ir])
 @pytest.mark.parametrize("original_mace", [True, False])
-def test_symmetric_contraction(dtype, layout, original_mace):
+@pytest.mark.parametrize("batch", [0, 32])
+def test_symmetric_contraction(dtype, layout, original_mace, batch):
     mul = 64
     irreps_in = mul * cue.Irreps("O3", "0e + 1o + 2e")
     irreps_out = mul * cue.Irreps("O3", "0e + 1o")
@@ -48,12 +49,11 @@ def test_symmetric_contraction(dtype, layout, original_mace):
         original_mace=original_mace,
     )
 
-    Z = 32
-    x = torch.randn((Z, irreps_in.dim), dtype=dtype).cuda()
-    indices = torch.randint(0, 5, (Z,), dtype=torch.int32).cuda()
+    x = torch.randn((batch, irreps_in.dim), dtype=dtype).cuda()
+    indices = torch.randint(0, 5, (batch,), dtype=torch.int32).cuda()
 
     out = m(x, indices)
-    assert out.shape == (Z, irreps_out.dim)
+    assert out.shape == (batch, irreps_out.dim)
 
 
 def from64(shape: tuple[int, ...], data: str) -> torch.Tensor:

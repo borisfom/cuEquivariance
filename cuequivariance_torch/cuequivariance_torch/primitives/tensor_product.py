@@ -15,7 +15,7 @@
 import logging
 import math
 import warnings
-from typing import *
+from typing import Optional, OrderedDict, Tuple
 
 import torch
 import torch.fx
@@ -47,6 +47,9 @@ class TensorProduct(torch.nn.Module):
         super().__init__()
         self.descriptor = descriptor
 
+        if math_dtype is None:
+            math_dtype = torch.get_default_dtype()
+
         try:
             self.f_cuda = _tensor_product_cuda(descriptor, device, math_dtype)
         except NotImplementedError as e:
@@ -54,6 +57,12 @@ class TensorProduct(torch.nn.Module):
             self.f_cuda = None
         except ImportError as e:
             logger.warning(f"CUDA implementation not available: {e}")
+            logger.warning(
+                "Did you forget to install the CUDA version of cuequivariance-ops-torch?\n"
+                "Install it with one of the following commands:\n"
+                "pip install cuequivariance-ops-torch-cu11\n"
+                "pip install cuequivariance-ops-torch-cu12"
+            )
             self.f_cuda = None
 
         self.f_fx = _tensor_product_fx(
@@ -88,6 +97,9 @@ class TensorProduct(torch.nn.Module):
         Raises:
             RuntimeError: If `use_fallback` is `False` and either no CUDA kernel is available or the input tensor is not on CUDA.
         """
+        if any(x.numel() == 0 for x in args):
+            use_fallback = True  # Empty tensors are not supported by the CUDA kernel
+
         if (
             args
             and args[0].device.type == "cuda"
@@ -113,7 +125,7 @@ class TensorProduct(torch.nn.Module):
 def _tensor_product_fx(
     descriptor: stp.SegmentedTensorProduct,
     device: Optional[torch.device],
-    math_dtype: Optional[torch.dtype],
+    math_dtype: torch.dtype,
     optimize_einsums: bool,
 ) -> torch.nn.Module:
     """
@@ -121,10 +133,6 @@ def _tensor_product_fx(
     - at least one input operand should have a batch dimension (ndim=2)
     - the output operand will have a batch dimension (ndim=2)
     """
-
-    if math_dtype is None:
-        math_dtype = torch.get_default_dtype()
-
     descriptor = descriptor.remove_zero_paths()
     descriptor = descriptor.remove_empty_segments()
 
@@ -285,7 +293,7 @@ class _Wrapper(torch.nn.Module):
                     (math.prod(shape), arg.shape[-1])
                 )
                 if math.prod(arg.shape[:-1]) > 1
-                else arg.reshape((1, arg.shape[-1]))
+                else arg.reshape((math.prod(arg.shape[:-1]), arg.shape[-1]))
             )
             for arg in args
         ]
@@ -310,7 +318,7 @@ def _sum(tensors, *, shape=None, like=None):
 def _tensor_product_cuda(
     descriptor: stp.SegmentedTensorProduct,
     device: Optional[torch.device],
-    math_dtype: Optional[torch.dtype],
+    math_dtype: torch.dtype,
 ) -> torch.nn.Module:
     logger.debug(f"Starting search for a cuda kernel for {descriptor}")
 
@@ -322,9 +330,6 @@ def _tensor_product_cuda(
             "Only descriptors with 3 or 4 operands are supported."
             f" Got {descriptor.subscripts}."
         )
-
-    if math_dtype is None:
-        math_dtype = torch.get_default_dtype()
 
     if not torch.cuda.is_available():
         raise NotImplementedError("CUDA is not available.")
@@ -438,12 +443,10 @@ class FusedTensorProductOp3(torch.nn.Module):
         self,
         x0: torch.Tensor,
         x1: torch.Tensor,
-        b2: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         x0, x1 = self._perm(x0, x1)
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
-        assert b2 is None
 
         shape = torch.broadcast_shapes(x0.shape[:-1], x1.shape[:-1])
         x0 = _reshape(x0, shape)
@@ -499,13 +502,11 @@ class FusedTensorProductOp4(torch.nn.Module):
         x0: torch.Tensor,
         x1: torch.Tensor,
         x2: torch.Tensor,
-        b3: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         x0, x1, x2 = self._perm(x0, x1, x2)
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
         assert x2.ndim >= 1, x2.ndim
-        assert b3 is None
 
         shape = torch.broadcast_shapes(x0.shape[:-1], x1.shape[:-1], x2.shape[:-1])
         x0 = _reshape(x0, shape)

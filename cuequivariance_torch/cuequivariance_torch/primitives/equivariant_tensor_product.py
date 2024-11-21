@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import *
+from typing import Optional, Union
 
 import torch
 
@@ -70,9 +70,6 @@ class EquivariantTensorProduct(torch.nn.Module):
         optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
-        cue.descriptors.fully_connected_tensor_product(
-            cue.Irreps("SO3", "2x1"), cue.Irreps("SO3", "2x1"), cue.Irreps("SO3", "2x1")
-        )
         if not isinstance(layout_in, tuple):
             layout_in = (layout_in,) * e.num_inputs
         if len(layout_in) != e.num_inputs:

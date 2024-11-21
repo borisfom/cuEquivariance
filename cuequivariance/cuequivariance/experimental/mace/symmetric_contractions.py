@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from functools import cache
-from typing import *
+from typing import Optional
 
 import numpy as np
 
@@ -164,7 +164,7 @@ def U_matrix_real(
     assert isinstance(ir_out, cue.Irrep)
 
     if correlation == 4:
-        filter_ir_mid = frozenset([G(l, (-1) ** l) for l in range(11 + 1)])
+        filter_ir_mid = frozenset([G(l, (-1) ** l) for l in range(11 + 1)])  # noqa E741
     else:
         filter_ir_mid = None
 

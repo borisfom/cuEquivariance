@@ -14,15 +14,13 @@
 # limitations under the License.
 import logging
 import math
-import warnings
-from typing import *
+from typing import Optional
 
 import torch
 import torch.fx
 
 import cuequivariance.segmented_tensor_product as stp
 import cuequivariance_torch as cuet
-from cuequivariance import segmented_tensor_product as stp
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +339,7 @@ class CUDAKernel(torch.nn.Module):
             f"Calling SymmetricTensorContraction: {self.descriptors}, input shapes: {x0.shape}, {i0.shape}, {x1.shape}"
         )
         out = self.f(x1, x0, i0)
-        out = out.reshape(out.shape[0], -1)
+        out = out.reshape(out.shape[0], out.shape[1] * self.u)
         return out
 
 
