@@ -47,6 +47,9 @@ class TensorProduct(torch.nn.Module):
         super().__init__()
         self.descriptor = descriptor
 
+        if math_dtype is None:
+            math_dtype = torch.get_default_dtype()
+
         try:
             self.f_cuda = _tensor_product_cuda(descriptor, device, math_dtype)
         except NotImplementedError as e:
@@ -116,7 +119,7 @@ class TensorProduct(torch.nn.Module):
 def _tensor_product_fx(
     descriptor: stp.SegmentedTensorProduct,
     device: Optional[torch.device],
-    math_dtype: Optional[torch.dtype],
+    math_dtype: torch.dtype,
     optimize_einsums: bool,
 ) -> torch.nn.Module:
     """
@@ -124,10 +127,6 @@ def _tensor_product_fx(
     - at least one input operand should have a batch dimension (ndim=2)
     - the output operand will have a batch dimension (ndim=2)
     """
-
-    if math_dtype is None:
-        math_dtype = torch.get_default_dtype()
-
     descriptor = descriptor.remove_zero_paths()
     descriptor = descriptor.remove_empty_segments()
 
@@ -313,7 +312,7 @@ def _sum(tensors, *, shape=None, like=None):
 def _tensor_product_cuda(
     descriptor: stp.SegmentedTensorProduct,
     device: Optional[torch.device],
-    math_dtype: Optional[torch.dtype],
+    math_dtype: torch.dtype,
 ) -> torch.nn.Module:
     logger.debug(f"Starting search for a cuda kernel for {descriptor}")
 
@@ -325,9 +324,6 @@ def _tensor_product_cuda(
             "Only descriptors with 3 or 4 operands are supported."
             f" Got {descriptor.subscripts}."
         )
-
-    if math_dtype is None:
-        math_dtype = torch.get_default_dtype()
 
     if not torch.cuda.is_available():
         raise NotImplementedError("CUDA is not available.")
