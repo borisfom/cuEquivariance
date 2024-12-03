@@ -174,6 +174,10 @@ class EquivariantTensorProduct(torch.nn.Module):
             if len(inputs) == 2:
                 [x0, x1] = inputs
                 if indices is None:
+                    torch._assert(
+                        x0.ndim == 2,
+                        f"Expected x0 to have shape (batch, dim), got {x0.shape}",
+                    )
                     if x0.shape[0] == 1:
                         indices = torch.zeros(
                             (x1.shape[0],), dtype=torch.int32, device=x1.device

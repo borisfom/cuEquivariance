@@ -153,4 +153,4 @@ def test_compile():
     m_compile = torch.compile(m, fullgraph=True)
     input1 = torch.randn(100, e.inputs[0].irreps.dim)
     input2 = torch.randn(100, e.inputs[1].irreps.dim)
-    m_compile(input1, input2)
+    m_compile([input1, input2])
