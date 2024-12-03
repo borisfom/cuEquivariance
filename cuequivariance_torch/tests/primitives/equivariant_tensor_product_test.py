@@ -153,7 +153,7 @@ def test_compile():
     m_compile = torch.compile(m, fullgraph=True)
     input1 = torch.randn(100, e.inputs[0].irreps.dim)
     input2 = torch.randn(100, e.inputs[1].irreps.dim)
-    m_compile(input1, input2)
+    m_compile([input1, input2])
 
 
 def test_script():
@@ -164,4 +164,4 @@ def test_script():
     m_script = torch.jit.script(m)
     input1 = torch.randn(100, e.inputs[0].irreps.dim)
     input2 = torch.randn(100, e.inputs[1].irreps.dim)
-    m_script(input1, input2)
+    m_script([input1, input2])
