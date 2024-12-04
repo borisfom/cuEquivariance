@@ -138,6 +138,9 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
     ):
         super().__init__()
 
+        if math_dtype is None:
+            math_dtype = torch.get_default_dtype()
+
         _check_descriptors(descriptors)
         self.descriptors = descriptors
 
@@ -258,12 +261,9 @@ class CUDAKernel(torch.nn.Module):
         self,
         stps: list[stp.SegmentedTensorProduct],
         device: Optional[torch.device],
-        math_dtype: Optional[torch.dtype],
+        math_dtype: torch.dtype,
     ):
         super().__init__()
-
-        if math_dtype is None:
-            math_dtype = torch.get_default_dtype()
 
         max_degree = max(d.num_operands - 2 for d in stps)
         if max_degree > 6:

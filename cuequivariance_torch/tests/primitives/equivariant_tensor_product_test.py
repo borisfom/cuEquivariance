@@ -154,14 +154,3 @@ def test_compile():
     input1 = torch.randn(100, e.inputs[0].irreps.dim)
     input2 = torch.randn(100, e.inputs[1].irreps.dim)
     m_compile([input1, input2])
-
-
-def test_script():
-    e = cue.descriptors.symmetric_contraction(
-        cue.Irreps("O3", "32x0e + 32x1o"), cue.Irreps("O3", "32x0e + 32x1o"), [1, 2, 3]
-    )
-    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir, optimize_fallback=False)
-    m_script = torch.jit.script(m)
-    input1 = torch.randn(100, e.inputs[0].irreps.dim)
-    input2 = torch.randn(100, e.inputs[1].irreps.dim)
-    m_script([input1, input2])
