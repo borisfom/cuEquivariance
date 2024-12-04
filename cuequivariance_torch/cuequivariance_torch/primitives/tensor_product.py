@@ -19,10 +19,47 @@ from typing import List, Optional, OrderedDict, Tuple
 
 import torch
 import torch.fx
-
+from torch.jit import Final
 from cuequivariance import segmented_tensor_product as stp
 
 logger = logging.getLogger(__name__)
+
+def prod(numbers: List[int]):
+    product = 1
+    for num in numbers:
+        product *= num
+    return product
+
+def broadcast_shapes(shapes: List[List[int]]):
+    if torch.jit.is_scripting():
+        max_len = 0
+        for shape in shapes:
+            if isinstance(shape, int):
+                if max_len < 1:
+                    max_len = 1
+            elif isinstance(shape, (tuple, list)):
+                s = len(shape)
+                if max_len < s:
+                    max_len = s
+        result = [1] * max_len
+        for shape in shapes:
+            if isinstance(shape, int):
+                shape = (shape,)
+            if isinstance(shape, (tuple, list)):
+                for i in range(-1, -1 - len(shape), -1):
+                    if shape[i] < 0:
+                        raise RuntimeError("Trying to create tensor with negative dimension ({}): ({})"
+                                           .format(shape[i], shape[i]))
+                    if shape[i] == 1 or shape[i] == result[i]:
+                        continue
+                    if result[i] != 1:
+                        raise RuntimeError("Shape mismatch: objects cannot be broadcast to a single shape")
+                    result[i] = shape[i]
+            else:
+                raise RuntimeError("Input shapes should be of type ints, a tuple of ints, or a list of ints, got ", shape)
+        return torch.Size(result)
+    else:
+        return torch.functional.broadcast_shapes(*shapes)
 
 
 class TensorProduct(torch.nn.Module):
@@ -36,25 +73,30 @@ class TensorProduct(torch.nn.Module):
         optimize_fallback (bool, optional): If `True`, the fallback method is optimized. If `False`, the fallback method is used without optimization.
     """
 
+    num_operands: Final[int]
+
     def __init__(
         self,
         descriptor: stp.SegmentedTensorProduct,
         *,
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
+        use_fallback: Optional[bool] = None,
         optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
         self.descriptor = descriptor
-
+        # for script()
+        self.num_operands = descriptor.num_operands
         if math_dtype is None:
             math_dtype = torch.get_default_dtype()
 
         try:
-            self.f_cuda = _tensor_product_cuda(descriptor, device, math_dtype)
+            self.f_cuda3, self.f_cuda4 = _tensor_product_cuda(descriptor, device, math_dtype)
         except NotImplementedError as e:
             logger.info(f"CUDA implementation not available: {e}")
-            self.f_cuda = None
+            self.f_cuda3 = None
+            self.f_cuda4 = None
         except ImportError as e:
             logger.warning(f"CUDA implementation not available: {e}")
             logger.warning(
@@ -63,16 +105,20 @@ class TensorProduct(torch.nn.Module):
                 "pip install cuequivariance-ops-torch-cu11\n"
                 "pip install cuequivariance-ops-torch-cu12"
             )
-            self.f_cuda = None
+            self.f_cuda3 = None
+            self.f_cuda4 = None
 
-        self.f_fx = _tensor_product_fx(
-            descriptor, device, math_dtype, optimize_fallback is True
-        )
+        if use_fallback == True: 
+            self.f_fx = _tensor_product_fx(
+                descriptor, device, math_dtype, optimize_fallback is True
+            )
+        else:
+            self.f_fx = None
         self._optimize_fallback = optimize_fallback
 
     def __repr__(self):
         has_cuda_kernel = (
-            "(with CUDA kernel)" if self.f_cuda is not None else "(without CUDA kernel)"
+            "(with CUDA kernel)" if self.f_cuda3 is not None or self.f_cuda4 is not None else "(without CUDA kernel)"
         )
         return f"TensorProduct({self.descriptor} {has_cuda_kernel})"
 
@@ -103,13 +149,15 @@ class TensorProduct(torch.nn.Module):
         if (
             inputs
             and inputs[0].device.type == "cuda"
-            and self.f_cuda is not None
             and (use_fallback is not True)
         ):
-            return self.f_cuda(*inputs)
+            if self.f_cuda3 is not None:
+                return self.f_cuda3(inputs[0], inputs[1])
+            else:
+                return self.f_cuda4(inputs[0], inputs[1], inputs[2])
 
         if use_fallback is False:
-            if self.f_cuda is not None:
+            if self.f_cuda3 is not None and self.f_cuda4 is not None:
                 raise RuntimeError("CUDA kernel available but input is not on CUDA")
             else:
                 raise RuntimeError("No CUDA kernel available")
@@ -119,6 +167,8 @@ class TensorProduct(torch.nn.Module):
                 "The fallback method is used but it has not been optimized. "
                 "Consider setting optimize_fallback=True when creating the TensorProduct module."
             )
+        if self.f_fx is None:
+                raise RuntimeError("No fallback method available")
         return self.f_fx(inputs)
 
 
@@ -190,7 +240,7 @@ def _tensor_product_fx(
             seg_shape = descriptor.get_segment_shape(-1, path)
             outputs += [
                 out.reshape(
-                    out.shape[: out.ndim - len(seg_shape)] + (math.prod(seg_shape),)
+                    out.shape[: out.ndim - len(seg_shape)] + (prod(seg_shape),)
                 )
             ]
 
@@ -206,7 +256,7 @@ def _tensor_product_fx(
                         for out, path in zip(outputs, descriptor.paths)
                         if path.indices[-1] == i
                     ],
-                    shape=batch_shape + (math.prod(descriptor.operands[-1][i]),),
+                    shape=batch_shape + (prod(descriptor.operands[-1][i]),),
                     like=outputs[0],
                 )
                 for i in range(descriptor.operands[-1].num_segments)
@@ -252,7 +302,7 @@ def _tensor_product_fx(
                     )
 
             def forward(self, *args):
-                shape = torch.broadcast_shapes(*[arg.shape[:-1] for arg in args])
+                shape = broadcast_shapes([arg.shape[:-1] for arg in args])
                 output = torch.zeros(
                     shape + (descriptor.operands[-1].size,),
                     device=device,
@@ -278,22 +328,23 @@ class _Wrapper(torch.nn.Module):
         self.module = module
         self.descriptor = descriptor
 
-    def forward(self, args):
-        for oid, arg in enumerate(args):
-            torch._assert(
-                arg.shape[-1] == self.descriptor.operands[oid].size,
-                "input shape[-1] does not match operand size",
-            )
+    def forward(self, args:List[torch.Tensor]):
+        if not torch.jit.is_scripting():
+            for oid, arg in enumerate(args):
+                torch._assert(
+                    arg.shape[-1] == self.descriptor.operands[oid].size,
+                    "input shape[-1] does not match operand size",
+                )
 
-        shape = torch.broadcast_shapes(*[arg.shape[:-1] for arg in args])
+        shape = broadcast_shapes([arg.shape[:-1] for arg in args])
 
         args = [
             (
                 arg.expand(shape + (arg.shape[-1],)).reshape(
-                    (math.prod(shape), arg.shape[-1])
+                    (prod(shape), arg.shape[-1])
                 )
-                if math.prod(arg.shape[:-1]) > 1
-                else arg.reshape((math.prod(arg.shape[:-1]), arg.shape[-1]))
+                if prod(arg.shape[:-1]) > 1
+                else arg.reshape((prod(arg.shape[:-1]), arg.shape[-1]))
             )
             for arg in args
         ]
@@ -353,9 +404,9 @@ def _tensor_product_cuda(
                 operand_num_segments=[o.num_segments for o in d.operands],
             ):
                 if descriptor.num_operands == 3:
-                    return TensorProductUniform3x1d(d, device, math_dtype)
+                    return TensorProductUniform3x1d(d, device, math_dtype), None
                 else:
-                    return TensorProductUniform4x1d(d, device, math_dtype)
+                    return None, TensorProductUniform4x1d(d, device, math_dtype)
 
     supported_targets = [
         stp.Subscripts(subscripts)
@@ -385,18 +436,18 @@ def _tensor_product_cuda(
         )
 
     if descriptor.num_operands == 3:
-        return FusedTensorProductOp3(descriptor, perm[:2], device, math_dtype)
+        return FusedTensorProductOp3(descriptor, perm[:2], device, math_dtype), None
     elif descriptor.num_operands == 4:
-        return FusedTensorProductOp4(descriptor, perm[:3], device, math_dtype)
+        return None, FusedTensorProductOp4(descriptor, perm[:3], device, math_dtype)
 
-
-def _reshape(x: torch.Tensor, leading_shape: tuple[int, ...]) -> torch.Tensor:
+                        
+def _reshape(x: torch.Tensor, leading_shape: List[int]) -> torch.Tensor:
     # Make x have shape (Z, x.shape[-1]) or (x.shape[-1],)
-    if math.prod(leading_shape) > 1 and math.prod(x.shape[:-1]) == 1:
+    if prod(leading_shape) > 1 and prod(x.shape[:-1]) == 1:
         return x.reshape((x.shape[-1],))
     else:
         return x.expand(leading_shape + (x.shape[-1],)).reshape(
-            (math.prod(leading_shape), x.shape[-1])
+            (prod(leading_shape), x.shape[-1])
         )
 
 
@@ -434,7 +485,7 @@ class FusedTensorProductOp3(torch.nn.Module):
         ).to(device=device)
 
     def __repr__(self) -> str:
-        return f"TensorProductCUDA({self.descriptor} (output last operand))"
+        return f"FusedTensorProductOp3({self.descriptor} (output last operand))"
 
     def forward(
         self,
@@ -445,13 +496,14 @@ class FusedTensorProductOp3(torch.nn.Module):
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
 
-        shape = torch.broadcast_shapes(x0.shape[:-1], x1.shape[:-1])
+        shape = broadcast_shapes([x0.shape[:-1], x1.shape[:-1]])
         x0 = _reshape(x0, shape)
         x1 = _reshape(x1, shape)
 
-        logger.debug(
-            f"Calling FusedTensorProductOp3: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
-        )
+        if not torch.jit.is_scripting():
+            logger.debug(
+                f"Calling FusedTensorProductOp3: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
+            )
 
         out = self._f(x0, x1)
 
@@ -492,7 +544,7 @@ class FusedTensorProductOp4(torch.nn.Module):
         ).to(device=device)
 
     def __repr__(self) -> str:
-        return f"TensorProductCUDA({self.descriptor} (output last operand))"
+        return f"FusedTensorProductOp4({self.descriptor} (output last operand))"
 
     def forward(
         self,
@@ -505,14 +557,15 @@ class FusedTensorProductOp4(torch.nn.Module):
         assert x1.ndim >= 1, x1.ndim
         assert x2.ndim >= 1, x2.ndim
 
-        shape = torch.broadcast_shapes(x0.shape[:-1], x1.shape[:-1], x2.shape[:-1])
+        shape = broadcast_shapes([x0.shape[:-1], x1.shape[:-1], x2.shape[:-1]])
         x0 = _reshape(x0, shape)
         x1 = _reshape(x1, shape)
         x2 = _reshape(x2, shape)
 
-        logger.debug(
-            f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
-        )
+        if not torch.jit.is_scripting():
+            logger.debug(
+                f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
+            )
 
         out = self._f(x0, x1, x2)
 
@@ -546,13 +599,13 @@ class TensorProductUniform3x1d(torch.nn.Module):
         ).to(device=device)
 
     def __repr__(self):
-        return f"TensorProductCUDA({self.descriptor} (output last operand))"
+        return f"TensorProductUniform3x1d({self.descriptor} (output last operand))"
 
-    def forward(self, x0, x1):
+    def forward(self, x0:torch.Tensor, x1:torch.Tensor):
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
 
-        shape = torch.broadcast_shapes(x0.shape[:-1], x1.shape[:-1])
+        shape = broadcast_shapes([x0.shape[:-1], x1.shape[:-1]])
         x0 = _reshape(x0, shape)
         x1 = _reshape(x1, shape)
 
@@ -561,9 +614,10 @@ class TensorProductUniform3x1d(torch.nn.Module):
         if x1.ndim == 1:
             x1 = x1.unsqueeze(0)
 
-        logger.debug(
-            f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
-        )
+        if not torch.jit.is_scripting():
+            logger.debug(
+                f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
+            )
 
         out = self._f(x0, x1)
 
@@ -597,14 +651,14 @@ class TensorProductUniform4x1d(torch.nn.Module):
         ).to(device=device)
 
     def __repr__(self):
-        return f"TensorProductCUDA({self.descriptor} (output last operand))"
+        return f"TensorProductUniform4x1d({self.descriptor} (output last operand))"
 
     def forward(self, x0, x1, x2):
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
         assert x2.ndim >= 1, x2.ndim
 
-        shape = torch.broadcast_shapes(x0.shape[:-1], x1.shape[:-1], x2.shape[:-1])
+        shape = broadcast_shapes([x0.shape[:-1], x1.shape[:-1], x2.shape[:-1]])
         x0 = _reshape(x0, shape)
         x1 = _reshape(x1, shape)
         x2 = _reshape(x2, shape)
@@ -616,9 +670,10 @@ class TensorProductUniform4x1d(torch.nn.Module):
         if x2.ndim == 1:
             x2 = x2.unsqueeze(0)
 
-        logger.debug(
-            f"Calling TensorProductUniform4x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
-        )
+        if not torch.jit.is_scripting():
+            logger.debug(
+                f"Calling TensorProductUniform4x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
+            )
 
         out = self._f(x0, x1, x2)
 

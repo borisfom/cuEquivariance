@@ -145,7 +145,6 @@ class EquivariantTensorProduct(torch.nn.Module):
         """
         If ``indices`` is not None, the first input is indexed by ``indices``.
         """
-        inputs: List[torch.Tensor] = list(inputs)
 
         assert len(inputs) == len(self.etp.inputs)
         for a, dim in zip(inputs, self.operands_dims):

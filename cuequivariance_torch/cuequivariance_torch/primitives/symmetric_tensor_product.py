@@ -203,7 +203,7 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
             x0.ndim == 2,
             f"Expected 2 dims (i0.max() + 1, x0_size), got shape {x0.shape}",
         )
-        shape = torch.broadcast_shapes(i0.shape, x1.shape[:-1])
+        shape = broadcast_shapes(i0.shape, x1.shape[:-1])
         i0 = i0.expand(shape).reshape((math.prod(shape),))
         x1 = x1.expand(shape + (x1.shape[-1],)).reshape(
             (math.prod(shape), x1.shape[-1])
@@ -335,9 +335,9 @@ class CUDAKernel(torch.nn.Module):
         i0 = i0.to(torch.int32)
         x0 = x0.reshape(x0.shape[0], x0.shape[1] // self.u, self.u)
         x1 = x1.reshape(x1.shape[0], x1.shape[1] // self.u, self.u)
-        logger.debug(
-            f"Calling SymmetricTensorContraction: {self.descriptors}, input shapes: {x0.shape}, {i0.shape}, {x1.shape}"
-        )
+        # logger.debug(
+        #     f"Calling SymmetricTensorContraction: {self.descriptors}, input shapes: {x0.shape}, {i0.shape}, {x1.shape}"
+        # )
         out = self.f(x1, x0, i0)
         out = out.reshape(out.shape[0], out.shape[1] * self.u)
         return out
