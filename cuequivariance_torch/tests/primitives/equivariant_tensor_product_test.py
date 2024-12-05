@@ -170,7 +170,6 @@ def test_compile():
     input2 = torch.randn(100, e.inputs[1].irreps.dim).cuda()
     m_compile([input1, input2])
 
-
 def test_script():
     e = cue.descriptors.symmetric_contraction(
         cue.Irreps("O3", "32x0e + 32x1o"), cue.Irreps("O3", "32x0e + 32x1o"), [1, 2, 3]
@@ -183,3 +182,4 @@ def test_script():
     input1 = torch.randn(100, e.inputs[0].irreps.dim).cuda()
     input2 = torch.randn(100, e.inputs[1].irreps.dim).cuda()
     m_script([input1, input2])
+
