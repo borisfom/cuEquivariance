@@ -31,24 +31,30 @@ class Transpose1Dispatcher(Dispatcher):
         self,
         inputs: List[torch.Tensor]
     ):
-        inputs[0] = self.tp[0](inputs[0])
-
+        ret = inputs.copy()
+        ret[0] = self.tp[0](ret[0])
+        return ret
+    
 class Transpose2Dispatcher(Dispatcher):
     def forward(
         self,
         inputs: List[torch.Tensor]
     ):
-        inputs[0] = self.tp[0](inputs[0])
-        inputs[1] = self.tp[1](inputs[1])
+        ret = inputs.copy()
+        ret[0] = self.tp[0](ret[0])
+        ret[1] = self.tp[1](ret[1])
+        return ret
 
 class Transpose3Dispatcher(Dispatcher):
     def forward(
         self,
         inputs: List[torch.Tensor]
     ):
-        inputs[0] = self.tp[0](inputs[0])
-        inputs[1] = self.tp[1](inputs[1])
-        inputs[2] = self.tp[2](inputs[2])
+        ret = inputs.copy()
+        ret[0] = self.tp[0](ret[0])
+        ret[1] = self.tp[1](ret[1])
+        ret[2] = self.tp[1](ret[2])
+        return ret
 
 TRANSPOSE_DISPATCHERS = [Transpose1Dispatcher, Transpose2Dispatcher, Transpose3Dispatcher]
 
@@ -233,7 +239,7 @@ class EquivariantTensorProduct(torch.nn.Module):
             assert a.shape[-1] == dim
 
         # Transpose inputs
-        self.transpose_in.forward(inputs)
+        inputs = self.transpose_in(inputs)
 
         # Compute tensor product
         output = self.tp(inputs, indices)
