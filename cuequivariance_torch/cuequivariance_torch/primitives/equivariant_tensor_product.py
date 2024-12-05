@@ -55,8 +55,7 @@ class IWeightedSymmetricTPDispatcher(Dispatcher):
             inputs: List[torch.Tensor],
             indices: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        x0 = inputs[0]
-        x1 = inputs[1]
+        x0, x1 = inputs
         if indices is None:
             torch._assert(
                 x0.ndim == 2,

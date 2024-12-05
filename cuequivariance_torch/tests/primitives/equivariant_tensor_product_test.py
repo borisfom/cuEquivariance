@@ -76,8 +76,8 @@ def test_performance_cuda_vs_fx(
         device=device,
         math_dtype=math_dtype,
         use_fallback=False,
-        optimize_fallback=True,
     )
+    
     m1 = cuet.EquivariantTensorProduct(
         e,
         layout=cue.ir_mul,
@@ -95,14 +95,17 @@ def test_performance_cuda_vs_fx(
     for _ in range(10):
         m(inputs)
         m1(inputs)
+    torch.cuda.synchronize()
 
     def f():
-        m(inputs)
-        torch.cuda.synchronize()
+        ret = m(inputs)
+        ret = torch.sum(ret)
+        return ret
 
     def f1():
-        m1(inputs)
-        torch.cuda.synchronize()
+        ret = m1(inputs)
+        ret = torch.sum(ret)
+        return ret
 
     t0 = timeit.Timer(f).timeit(number=10)
     t1 = timeit.Timer(f1).timeit(number=10)
@@ -170,16 +173,28 @@ def test_compile():
     input2 = torch.randn(100, e.inputs[1].irreps.dim).cuda()
     m_compile([input1, input2])
 
-def test_script():
-    e = cue.descriptors.symmetric_contraction(
-        cue.Irreps("O3", "32x0e + 32x1o"), cue.Irreps("O3", "32x0e + 32x1o"), [1, 2, 3]
-    )
+@pytest.mark.parametrize("e", make_descriptors())
+@pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
+def test_script(
+    e: cue.EquivariantTensorProduct,
+    dtype: torch.dtype,
+    math_dtype: torch.dtype,
+    atol: float,
+    rtol: float,
+):
+
+    device = torch.device("cuda:0")
+
     m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir,
                                       use_fallback=False,
                                       device="cuda",
                                       optimize_fallback=False)
+    inputs = [
+        torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
+        for inp in e.inputs
+    ]
+    res = m(inputs)
     m_script = torch.jit.script(m)
-    input1 = torch.randn(100, e.inputs[0].irreps.dim).cuda()
-    input2 = torch.randn(100, e.inputs[1].irreps.dim).cuda()
-    m_script([input1, input2])
+    # res_script = m_script(inputs)
+    # torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
 

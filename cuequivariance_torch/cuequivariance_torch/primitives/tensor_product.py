@@ -546,8 +546,7 @@ class FusedTensorProductOp4(torch.nn.Module):
 
         return out.reshape(shape + (out.shape[-1],))
 
-
-class TensorProductUniform3x1d(torch.nn.Module):
+class TensorProductUniform1d(torch.nn.Module):
     def __init__(
         self,
         descriptor: stp.SegmentedTensorProduct,
@@ -573,10 +572,11 @@ class TensorProductUniform3x1d(torch.nn.Module):
             math_dtype=math_dtype,
         ).to(device=device)
 
+class TensorProductUniform3x1d(TensorProductUniform1d):
     def __repr__(self):
         return f"TensorProductUniform3x1d({self.descriptor} (output last operand))"
 
-    def forward(self, inputs: List[torch.Tensor]):
+    def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1 = inputs
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
@@ -595,36 +595,12 @@ class TensorProductUniform3x1d(torch.nn.Module):
                 f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
 
-        out = self._f(x0, x1)
+        out = self._f(x0, x1, x0)
 
         return out.reshape(shape + (out.shape[-1],))
 
 
-class TensorProductUniform4x1d(torch.nn.Module):
-    def __init__(
-        self,
-        descriptor: stp.SegmentedTensorProduct,
-        device: Optional[torch.device],
-        math_dtype: torch.dtype,
-    ):
-        super().__init__()
-        import cuequivariance_ops_torch as ops
-
-        self.descriptor = descriptor
-
-        assert len(descriptor.subscripts.modes()) == 1
-        assert descriptor.all_same_segment_shape()
-        assert descriptor.coefficient_subscripts == ""
-        u = next(iter(descriptor.get_dims(descriptor.subscripts.modes()[0])))
-
-        self._f = ops.TensorProductUniform1d(
-            operand_dim=[ope.ndim for ope in descriptor.operands],
-            operand_extent=u,
-            operand_num_segments=[ope.num_segments for ope in descriptor.operands],
-            path_indices=[path.indices for path in descriptor.paths],
-            path_coefficients=[float(path.coefficients) for path in descriptor.paths],
-            math_dtype=math_dtype,
-        ).to(device=device)
+class TensorProductUniform4x1d(TensorProductUniform1d):
 
     def __repr__(self):
         return f"TensorProductUniform4x1d({self.descriptor} (output last operand))"

@@ -46,7 +46,7 @@ def test_script_fused_tp_3():
     module = FusedTensorProductOp3(d, (0, 1), torch.device("cuda:0"), torch.float32)
     module = torch.jit.script(module)
 
-    assert module(x0, x1).shape == (batch, d.operands[2].size)
+    assert module([x0, x1]).shape == (batch, d.operands[2].size)
 
 
 def test_script_fused_tp_4():
@@ -67,7 +67,7 @@ def test_script_fused_tp_4():
     module = FusedTensorProductOp4(d, (0, 1, 2), torch.device("cuda:0"), torch.float32)
     module = torch.jit.script(module)
 
-    assert module(x0, x1, x2).shape == (batch, d.operands[3].size)
+    assert module([x0, x1, x2]).shape == (batch, d.operands[3].size)
 
 
 def test_script_uniform_tp_3():
@@ -86,7 +86,7 @@ def test_script_uniform_tp_3():
     module = TensorProductUniform3x1d(d, torch.device("cuda:0"), torch.float32)
     module = torch.jit.script(module)
 
-    assert module(x0, x1).shape == (batch, d.operands[2].size)
+    assert module([x0, x1]).shape == (batch, d.operands[2].size)
 
 
 def test_script_uniform_tp_4():
@@ -106,4 +106,4 @@ def test_script_uniform_tp_4():
     module = TensorProductUniform4x1d(d, torch.device("cuda:0"), torch.float32)
     module = torch.jit.script(module)
 
-    assert module(x0, x1, x2).shape == (batch, d.operands[3].size)
+    assert module([x0, x1, x2]).shape == (batch, d.operands[3].size)
