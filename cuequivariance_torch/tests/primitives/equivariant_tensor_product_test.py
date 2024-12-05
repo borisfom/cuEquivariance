@@ -75,6 +75,15 @@ def test_performance_cuda_vs_fx(
         layout=cue.ir_mul,
         device=device,
         math_dtype=math_dtype,
+        use_fallback=False,
+        optimize_fallback=True,
+    )
+    m1 = cuet.EquivariantTensorProduct(
+        e,
+        layout=cue.ir_mul,
+        device=device,
+        math_dtype=math_dtype,
+        use_fallback=True,
         optimize_fallback=True,
     )
 
@@ -84,15 +93,19 @@ def test_performance_cuda_vs_fx(
     ]
 
     for _ in range(10):
-        m(inputs, use_fallback=False)
-        m(inputs, use_fallback=True)
+        m(inputs)
+        m1(inputs)
 
-    def f(ufb: bool):
-        m(inputs, use_fallback=ufb)
+    def f():
+        m(inputs)
         torch.cuda.synchronize()
 
-    t0 = timeit.Timer(lambda: f(False)).timeit(number=10)
-    t1 = timeit.Timer(lambda: f(True)).timeit(number=10)
+    def f1():
+        m1(inputs)
+        torch.cuda.synchronize()
+
+    t0 = timeit.Timer(f).timeit(number=10)
+    t1 = timeit.Timer(f1).timeit(number=10)
     assert t0 < t1
 
 
@@ -129,18 +142,20 @@ def test_precision_cuda_vs_fx(
         layout=cue.ir_mul,
         device=device,
         math_dtype=math_dtype,
+        use_fallback=False
     )
-    y0 = m(inputs, use_fallback=False)
+    y0 = m(inputs)
 
     m = cuet.EquivariantTensorProduct(
         e,
         layout=cue.ir_mul,
         device=device,
         math_dtype=torch.float64,
+        use_fallback=True,
         optimize_fallback=True,
     )
-    inputs = map(lambda x: x.to(torch.float64), inputs)
-    y1 = m(inputs, use_fallback=True).to(dtype)
+    inputs = [x.to(torch.float64) for x in inputs]
+    y1 = m(inputs).to(dtype)
 
     torch.testing.assert_close(y0, y1, atol=atol, rtol=rtol)
 
@@ -149,10 +164,10 @@ def test_compile():
     e = cue.descriptors.symmetric_contraction(
         cue.Irreps("O3", "32x0e + 32x1o"), cue.Irreps("O3", "32x0e + 32x1o"), [1, 2, 3]
     )
-    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir, optimize_fallback=False)
+    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir, device="cuda", optimize_fallback=False)
     m_compile = torch.compile(m, fullgraph=True)
-    input1 = torch.randn(100, e.inputs[0].irreps.dim)
-    input2 = torch.randn(100, e.inputs[1].irreps.dim)
+    input1 = torch.randn(100, e.inputs[0].irreps.dim).cuda()
+    input2 = torch.randn(100, e.inputs[1].irreps.dim).cuda()
     m_compile([input1, input2])
 
 
@@ -160,8 +175,11 @@ def test_script():
     e = cue.descriptors.symmetric_contraction(
         cue.Irreps("O3", "32x0e + 32x1o"), cue.Irreps("O3", "32x0e + 32x1o"), [1, 2, 3]
     )
-    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir, optimize_fallback=False)
+    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir,
+                                      use_fallback=False,
+                                      device="cuda",
+                                      optimize_fallback=False)
     m_script = torch.jit.script(m)
-    input1 = torch.randn(100, e.inputs[0].irreps.dim)
-    input2 = torch.randn(100, e.inputs[1].irreps.dim)
+    input1 = torch.randn(100, e.inputs[0].irreps.dim).cuda()
+    input2 = torch.randn(100, e.inputs[1].irreps.dim).cuda()
     m_script([input1, input2])

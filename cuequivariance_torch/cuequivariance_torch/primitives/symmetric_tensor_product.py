@@ -21,6 +21,7 @@ import torch.fx
 
 import cuequivariance.segmented_tensor_product as stp
 import cuequivariance_torch as cuet
+from cuequivariance_torch.primitives.tensor_product import broadcast_shapes, prod
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class SymmetricTensorProduct(torch.nn.Module):
         *,
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
+        use_fallback: Optional[bool] = None,
         optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
@@ -55,6 +57,7 @@ class SymmetricTensorProduct(torch.nn.Module):
                 d0,
                 device=device,
                 math_dtype=math_dtype,
+                use_fallback = use_fallback,
                 optimize_fallback=optimize_fallback,
             )
         else:
@@ -86,7 +89,7 @@ class SymmetricTensorProduct(torch.nn.Module):
         )
 
     def forward(
-        self, x0: torch.Tensor, use_fallback: Optional[bool] = None
+        self, x0: torch.Tensor
     ) -> torch.Tensor:
         r"""
         Perform the forward pass of the indexed symmetric tensor product operation.
@@ -105,8 +108,7 @@ class SymmetricTensorProduct(torch.nn.Module):
         out = self.f(
             torch.ones((1, 1), dtype=x0.dtype, device=x0.device),
             torch.zeros((x0.shape[0],), dtype=torch.int32, device=x0.device),
-            x0,
-            use_fallback=use_fallback,
+            x0
         )
         if self.f0 is not None:
             out += self.f0([])
@@ -134,6 +136,7 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
         *,
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
+        use_fallback: Optional[bool] = None,
         optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
@@ -141,30 +144,35 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
         _check_descriptors(descriptors)
         self.descriptors = descriptors
 
-        try:
-            self.f_cuda = CUDAKernel(descriptors, device, math_dtype)
-        except NotImplementedError as e:
-            logger.info(f"Failed to initialize CUDA implementation: {e}")
-            self.f_cuda = None
-        except ImportError as e:
-            logger.warning(f"Failed to initialize CUDA implementation: {e}")
-            self.f_cuda = None
-
-        self.f_fx = FallbackImpl(
-            descriptors,
-            device,
-            math_dtype=math_dtype,
-            optimize_fallback=optimize_fallback,
-        )
-
         d = next(d for d in descriptors if d.num_operands >= 3)
         self.x0_size = d.operands[0].size
         self.x1_size = d.operands[1].size
         self.x2_size = d.operands[-1].size
+        self.has_cuda = False
+        
+        if not use_fallback == True:
+            try:
+                self.f = CUDAKernel(descriptors, device, math_dtype)
+                self.has_cuda = True
+                return
+            except NotImplementedError as e:
+                logger.info(f"Failed to initialize CUDA implementation: {e}")
+            except ImportError as e:
+                logger.warning(f"Failed to initialize CUDA implementation: {e}")
+                
+        if use_fallback == False:
+            raise RuntimeError("`use_fallback` is `False` and no CUDA kernel is available")
+        else:
+            self.f = FallbackImpl(
+                descriptors,
+                device,
+                math_dtype=math_dtype,
+                optimize_fallback=optimize_fallback,
+            )
 
     def __repr__(self):
         has_cuda_kernel = (
-            "(with CUDA kernel)" if self.f_cuda is not None else "(without CUDA kernel)"
+            "(with CUDA kernel)" if self.has_cuda is not None else "(without CUDA kernel)"
         )
         return f"IWeightedSymmetricTensorProduct({has_cuda_kernel})"
 
@@ -173,7 +181,6 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
         x0: torch.Tensor,
         i0: torch.Tensor,
         x1: torch.Tensor,
-        use_fallback: Optional[bool] = None,
     ) -> torch.Tensor:
         r"""
         Perform the forward pass of the indexed symmetric tensor product operation.
@@ -187,10 +194,6 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
             The index tensor for the first operand. It should have the shape (...).
         x1 : torch.Tensor
             The repeated input tensor. It should have the shape (..., x1_size).
-        use_fallback : Optional[bool], optional
-            If `None` (default), a CUDA kernel will be used if available.
-            If `False`, a CUDA kernel will be used, and an exception is raised if it's not available.
-            If `True`, a PyTorch fallback method is used regardless of CUDA kernel availability.
 
         Returns
         -------
@@ -203,30 +206,16 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
             x0.ndim == 2,
             f"Expected 2 dims (i0.max() + 1, x0_size), got shape {x0.shape}",
         )
-        shape = broadcast_shapes(i0.shape, x1.shape[:-1])
-        i0 = i0.expand(shape).reshape((math.prod(shape),))
+        shape = broadcast_shapes([i0.shape, x1.shape[:-1]])
+        i0 = i0.expand(shape).reshape((prod(shape),))
         x1 = x1.expand(shape + (x1.shape[-1],)).reshape(
-            (math.prod(shape), x1.shape[-1])
+            (prod(shape), x1.shape[-1])
         )
-
-        if (
-            x0.device.type == "cuda"
-            and self.f_cuda is not None
-            and (use_fallback is not True)
-        ):
-            out = self.f_cuda(x0, i0, x1)
-            out = out.reshape(shape + (self.x2_size,))
-            return out
-
-        if use_fallback is False:
-            if self.f_cuda is not None:
-                raise RuntimeError("CUDA kernel available but input is not on CUDA")
-            else:
-                raise RuntimeError("No CUDA kernel available")
-
-        out = self.f_fx(x0, i0, x1)
+        
+        out = self.f(x0, i0, x1)  
         out = out.reshape(shape + (self.x2_size,))
         return out
+
 
 
 def _check_descriptors(descriptors: list[stp.SegmentedTensorProduct]):
@@ -368,6 +357,6 @@ class FallbackImpl(torch.nn.Module):
         self, x0: torch.Tensor, i0: torch.Tensor, x1: torch.Tensor
     ) -> torch.Tensor:
         return sum(
-            f([x0[i0]] + [x1] * (f.descriptor.num_operands - 2), use_fallback=True)
+            f([x0[i0]] + [x1] * (f.descriptor.num_operands - 2))
             for f in self.fs
         )

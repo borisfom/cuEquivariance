@@ -36,19 +36,22 @@ class TransposeIrrepsLayout(torch.nn.Module):
         source: cue.IrrepsLayout,
         target: cue.IrrepsLayout,
         device: Optional[torch.device] = None,
+        use_fallback: Optional[bool] = False
     ):
         super().__init__()
 
         if (source, target) == (cue.mul_ir, cue.ir_mul):
             self.f = TransposeSegments(
-                [(mul, ir.dim) for mul, ir in irreps], device=device
+                [(mul, ir.dim) for mul, ir in irreps], device=device,
+                use_fallback = use_fallback
             )
         elif (source, target) == (cue.ir_mul, cue.mul_ir):
             self.f = TransposeSegments(
-                [(ir.dim, mul) for mul, ir in irreps], device=device
+                [(ir.dim, mul) for mul, ir in irreps], device=device,
+                use_fallback = use_fallback
             )
         else:
-            self.f = _Identity()
+            self.f = torch.nn.Identity()
 
         self.source, self.target = source, target
 
@@ -59,7 +62,7 @@ class TransposeIrrepsLayout(torch.nn.Module):
         return f"TransposeIrrepsLayout({self.source} -> {self.target})"
 
     def forward(
-        self, x: torch.Tensor, use_fallback: Optional[bool] = None
+        self, x: torch.Tensor
     ) -> torch.Tensor:
         r"""
         Perform the transposition.
@@ -74,17 +77,13 @@ class TransposeIrrepsLayout(torch.nn.Module):
             torch.Tensor: The transposed tensor.
         """
 
-        return self.f(x, use_fallback=use_fallback)
-
-
-class _Identity(torch.nn.Module):
-    def forward(self, x: torch.Tensor, **kwargs):
-        return x
+        return self.f(x)
 
 
 class TransposeSegments(torch.nn.Module):
     def __init__(
-        self, segments: list[tuple[int, int]], device: Optional[torch.device] = None
+            self, segments: list[tuple[int, int]], device: Optional[torch.device] = None,
+            use_fallback: Optional[bool] = False
     ):
         super().__init__()
 
@@ -97,8 +96,8 @@ class TransposeSegments(torch.nn.Module):
                 self.f_cuda = None
             else:
                 self.f_cuda = _transpose(info).to(device=device)
-
-            self.f = _transpose_segments_fx(segments).to(device=device)
+            if use_fallback:
+                self.f = _transpose_segments_fx(segments).to(device=device)
         else:
             self.f_cuda = torch.nn.Identity()
             self.f = torch.nn.Identity()
@@ -107,7 +106,7 @@ class TransposeSegments(torch.nn.Module):
         return "TransposeSegments()"
 
     def forward(
-        self, x: torch.Tensor, use_fallback: Optional[bool] = None
+        self, x: torch.Tensor
     ) -> torch.Tensor:
         """
         Perform the transposition of the input tensor using either a CUDA kernel or a PyTorch fallback.
@@ -131,20 +130,10 @@ class TransposeSegments(torch.nn.Module):
         RuntimeError
             If `use_fallback` is `False` and a CUDA kernel is not available or the input is not on CUDA.
         """
-        if (
-            x.device.type == "cuda"
-            and self.f_cuda is not None
-            and (use_fallback is not True)
-        ):
+        if self.f_cuda is not None:
             return self.f_cuda(x)
-
-        if use_fallback is False:
-            if self.f_cuda is not None:
-                raise RuntimeError("CUDA kernel available but input is not on CUDA")
-            else:
-                raise RuntimeError("No CUDA kernel available")
-
-        return self.f(x)
+        else:
+            return self.f(x)
 
 
 def _transpose_segments_fx(segments: list[tuple[int, int]]) -> torch.nn.Module:

@@ -118,7 +118,7 @@ def test_primitive_tensor_product_cuda_vs_fx(
             d, device=device, math_dtype=torch.float64, use_fallback=True, optimize_fallback=False
         )
         inputs_ = [inp.clone().to(torch.float64) for inp in inputs]
-        out2 = m(inputs_, use_fallback=True)
+        out2 = m(inputs_)
 
         assert out1.shape[:-1] == torch.broadcast_shapes(*batches)
         assert out1.dtype == dtype

@@ -21,6 +21,59 @@ import cuequivariance_torch as cuet
 from cuequivariance.irreps_array.misc_ui import default_layout
 
 
+class Dispatcher(torch.nn.Module):
+    def __init__(self, tp):
+        super().__init__()
+        self.tp = tp
+
+
+class TPDispatcher(Dispatcher):
+    def forward(
+        self,
+        inputs: List[torch.Tensor],
+        indices: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        if indices is not None:
+            # TODO: at some point we will have kernel for this
+            assert len(inputs) >= 1
+            inputs[0] = inputs[0][indices]
+        return  self.tp(inputs)
+
+    
+class SymmetricTPDispatcher(Dispatcher):
+    def forward(
+        self,
+        inputs: List[torch.Tensor],
+        indices: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        assert indices is None
+        return self.tp(inputs[0])
+    
+class IWeightedSymmetricTPDispatcher(Dispatcher):
+    def forward(
+            self,
+            inputs: List[torch.Tensor],
+            indices: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        x0 = inputs[0]
+        x1 = inputs[1]
+        if indices is None:
+            torch._assert(
+                x0.ndim == 2,
+                f"Expected x0 to have shape (batch, dim), got {x0.shape}",
+            )
+            if x0.shape[0] == 1:
+                indices = torch.zeros(
+                    (x1.shape[0],), dtype=torch.int32, device=x1.device
+                )
+            else:  #  x0.shape[0] == x1.shape[0]:
+                indices = torch.arange(
+                    x1.shape[0], dtype=torch.int32, device=x1.device
+                )
+        # borisf : why was it here ?
+        # if indices is not None:
+        return self.tp(x0, indices, x1)
+
 class EquivariantTensorProduct(torch.nn.Module):
     r"""Equivariant tensor product.
 
@@ -31,7 +84,10 @@ class EquivariantTensorProduct(torch.nn.Module):
         layout_out (IrrepsLayout): layout for output.
         device (torch.device): device of the Module.
         math_dtype (torch.dtype): dtype for internal computations.
+        use_fallback (bool, optional):  Determines the computation method. If `None` (default), a CUDA kernel will be used if available. If `False`, a CUDA kernel will be used, and an exception is raised if it's not available. If `True`, a PyTorch fallback method is used regardless of CUDA kernel availability.
         optimize_fallback (bool): whether to optimize the fallback implementation.
+    Raises:
+        RuntimeError: If `use_fallback` is `False` and no CUDA kernel is available.
 
     Examples:
         >>> e = cue.descriptors.fully_connected_tensor_product(
@@ -55,7 +111,7 @@ class EquivariantTensorProduct(torch.nn.Module):
         ...
                 [0., 0., 0., 0., 0., 0.]])
     """
-
+    
     def __init__(
         self,
         e: cue.EquivariantTensorProduct,
@@ -67,6 +123,7 @@ class EquivariantTensorProduct(torch.nn.Module):
         layout_out: Optional[cue.IrrepsLayout] = None,
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
+        use_fallback: Optional[bool] = None,
         optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
@@ -92,6 +149,7 @@ class EquivariantTensorProduct(torch.nn.Module):
                     source=layout_used,
                     target=input_expected.layout,
                     device=device,
+                    use_fallback = use_fallback
                 )
             )
         self.transpose_out = cuet.TransposeIrrepsLayout(
@@ -99,37 +157,42 @@ class EquivariantTensorProduct(torch.nn.Module):
             source=e.output.layout,
             target=layout_out,
             device=device,
+            use_fallback = use_fallback
         )
 
         if any(d.num_operands != e.num_inputs + 1 for d in e.ds):
-            self.tp = None
-
             if e.num_inputs == 1:
-                self.symm_tp = cuet.SymmetricTensorProduct(
-                    e.ds,
-                    device=device,
-                    math_dtype=math_dtype,
-                    optimize_fallback=optimize_fallback,
+                self.tp = SymmetricTPDispatcher(
+                    cuet.SymmetricTensorProduct(
+                        e.ds,
+                        device=device,
+                        math_dtype=math_dtype,
+                        use_fallback=use_fallback,
+                        optimize_fallback=optimize_fallback,
+                    )
                 )
             elif e.num_inputs == 2:
-                self.symm_tp = cuet.IWeightedSymmetricTensorProduct(
-                    e.ds,
-                    device=device,
-                    math_dtype=math_dtype,
-                    optimize_fallback=optimize_fallback,
+                self.tp = IWeightedSymmetricTPDispatcher(
+                    cuet.IWeightedSymmetricTensorProduct(
+                        e.ds,
+                        device=device,
+                        math_dtype=math_dtype,
+                        use_fallback=use_fallback,
+                        optimize_fallback=optimize_fallback,
+                    )
                 )
             else:
                 raise NotImplementedError("This should not happen")
         else:
-            [d] = e.ds
-
-            self.tp = cuet.TensorProduct(
-                d,
-                device=device,
-                math_dtype=math_dtype,
-                optimize_fallback=optimize_fallback,
+            self.tp = TPDispatcher(
+                cuet.TensorProduct(
+                    e.ds[0],
+                    device=device,
+                    math_dtype=math_dtype,
+                    use_fallback = use_fallback,
+                    optimize_fallback=optimize_fallback,
+                )
             )
-            self.symm_tp = None
 
         self.operands_dims = [op.irreps.dim for op in e.operands]
 
@@ -140,59 +203,24 @@ class EquivariantTensorProduct(torch.nn.Module):
         self,
         inputs: List[torch.Tensor],
         indices: Optional[torch.Tensor] = None,
-        use_fallback: Optional[bool] = None,
     ) -> torch.Tensor:
         """
         If ``indices`` is not None, the first input is indexed by ``indices``.
         """
 
-        assert len(inputs) == len(self.etp.inputs)
+        # assert len(inputs) == len(self.etp.inputs)
         for a, dim in zip(inputs, self.operands_dims):
             assert a.shape[-1] == dim
 
         # Transpose inputs
-        inputs = [
-            t(a, use_fallback=use_fallback) for t, a in zip(self.transpose_in, inputs)
-        ]
+        inputs[0] = self.transpose_in[0](inputs[0])
+        if len(self.transpose_in) > 1:
+            inputs[1] = self.transpose_in[1](inputs[1])
 
         # Compute tensor product
-        output = None
-
-        if self.tp is not None:
-            if indices is not None:
-                # TODO: at some point we will have kernel for this
-                assert len(inputs) >= 1
-                inputs[0] = inputs[0][indices]
-            output = self.tp(inputs, use_fallback=use_fallback)
-
-        if self.symm_tp is not None:
-            if len(inputs) == 1:
-                assert indices is None
-                output = self.symm_tp(inputs[0], use_fallback=use_fallback)
-
-            if len(inputs) == 2:
-                [x0, x1] = inputs
-                if indices is None:
-                    torch._assert(
-                        x0.ndim == 2,
-                        f"Expected x0 to have shape (batch, dim), got {x0.shape}",
-                    )
-                    if x0.shape[0] == 1:
-                        indices = torch.zeros(
-                            (x1.shape[0],), dtype=torch.int32, device=x1.device
-                        )
-                    elif x0.shape[0] == x1.shape[0]:
-                        indices = torch.arange(
-                            x1.shape[0], dtype=torch.int32, device=x1.device
-                        )
-
-                if indices is not None:
-                    output = self.symm_tp(x0, indices, x1, use_fallback=use_fallback)
-
-        if output is None:
-            raise NotImplementedError("This should not happen")
+        output = self.tp(inputs, indices)
 
         # Transpose output
-        output = self.transpose_out(output, use_fallback=use_fallback)
+        output = self.transpose_out(output)
 
         return output

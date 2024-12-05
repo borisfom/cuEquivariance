@@ -70,11 +70,13 @@ class TensorProduct(torch.nn.Module):
         descriptor (SegmentedTensorProduct): The descriptor of the segmented tensor product.
         math_dtype (torch.dtype, optional): The data type of the coefficients and calculations.
         device (torch.device, optional): The device on which the calculations are performed.
+        use_fallback (bool, optional):  Determines the computation method. If `None` (default), a CUDA kernel will be used if available. If `False`, a CUDA kernel will be used, and an exception is raised if it's not available. If `True`, a PyTorch fallback method is used regardless of CUDA kernel availability.
+
         optimize_fallback (bool, optional): If `True`, the fallback method is optimized. If `False`, the fallback method is used without optimization.
+        Raises:
+            RuntimeError: If `use_fallback` is `False` and no CUDA kernel is available.
+
     """
-
-    num_operands: Final[int]
-
     def __init__(
         self,
         descriptor: stp.SegmentedTensorProduct,
@@ -86,43 +88,47 @@ class TensorProduct(torch.nn.Module):
     ):
         super().__init__()
         self.descriptor = descriptor
-        # for script()
-        self.num_operands = descriptor.num_operands
         if math_dtype is None:
             math_dtype = torch.get_default_dtype()
-
-        try:
-            self.f_cuda3, self.f_cuda4 = _tensor_product_cuda(descriptor, device, math_dtype)
-        except NotImplementedError as e:
-            logger.info(f"CUDA implementation not available: {e}")
-            self.f_cuda3 = None
-            self.f_cuda4 = None
-        except ImportError as e:
-            logger.warning(f"CUDA implementation not available: {e}")
-            logger.warning(
-                "Did you forget to install the CUDA version of cuequivariance-ops-torch?\n"
-                "Install it with one of the following commands:\n"
-                "pip install cuequivariance-ops-torch-cu11\n"
-                "pip install cuequivariance-ops-torch-cu12"
-            )
-            self.f_cuda3 = None
-            self.f_cuda4 = None
-
-        if use_fallback == True: 
-            self.f_fx = _tensor_product_fx(
+        self.f = None
+        self.has_cuda = False
+        
+        if not use_fallback == True: 
+            try:
+                self.f = _tensor_product_cuda(descriptor, device, math_dtype)
+                self.has_cuda = True
+                return
+            except NotImplementedError as e:
+                logger.info(f"CUDA implementation not available: {e}")
+            except ImportError as e:
+                logger.warning(f"CUDA implementation not available: {e}")
+                logger.warning(
+                    "Did you forget to install the CUDA version of cuequivariance-ops-torch?\n"
+                    "Install it with one of the following commands:\n"
+                    "pip install cuequivariance-ops-torch-cu11\n"
+                    "pip install cuequivariance-ops-torch-cu12"
+                )
+                
+        if use_fallback == False: 
+            raise RuntimeError("`use_fallback` is `False` and no CUDA kernel is available!")
+        else:
+            self.f = _tensor_product_fx(
                 descriptor, device, math_dtype, optimize_fallback is True
             )
-        else:
-            self.f_fx = None
-        self._optimize_fallback = optimize_fallback
+            if optimize_fallback is None:
+                warnings.warn(
+                    "The fallback method is used but it has not been optimized. "
+                    "Consider setting optimize_fallback=True when creating the TensorProduct module."
+                )    
+            self._optimize_fallback = optimize_fallback
 
     def __repr__(self):
         has_cuda_kernel = (
-            "(with CUDA kernel)" if self.f_cuda3 is not None or self.f_cuda4 is not None else "(without CUDA kernel)"
+            "(with CUDA kernel)" if self.has_cuda else "(without CUDA kernel)"
         )
         return f"TensorProduct({self.descriptor} {has_cuda_kernel})"
 
-    def forward(self, inputs: List[torch.Tensor], use_fallback: Optional[bool] = None):
+    def forward(self, inputs: List[torch.Tensor]):
         r"""
         Perform the tensor product based on the specified descriptor.
 
@@ -130,9 +136,6 @@ class TensorProduct(torch.nn.Module):
             inputs (list of torch.Tensor): The input tensors. The number of input tensors should match the number of operands in the descriptor minus one.
                 Each input tensor should have a shape of ((batch,) operand_size), where `operand_size` corresponds to the size
                 of each operand as defined in the tensor product descriptor.
-            use_fallback (bool, optional):  Determines the computation method. If `None` (default), a CUDA kernel will be used if available and the input
-                is on CUDA. If `False`, a CUDA kernel will be used, and an exception is raised if it's not available or the
-                input is not on CUDA. If `True`, a PyTorch fallback method is used regardless of CUDA kernel availability.
 
         Returns:
             torch.Tensor:
@@ -140,36 +143,11 @@ class TensorProduct(torch.nn.Module):
                 It has a shape of (batch, last_operand_size), where
                 `last_operand_size` is the size of the last operand in the descriptor.
 
-        Raises:
-            RuntimeError: If `use_fallback` is `False` and either no CUDA kernel is available or the input tensor is not on CUDA.
         """
-        if any(x.numel() == 0 for x in inputs):
-            use_fallback = True  # Empty tensors are not supported by the CUDA kernel
+        # if any(x.numel() == 0 for x in inputs):
+        #    use_fallback = True  # Empty tensors are not supported by the CUDA kernel
 
-        if (
-            inputs
-            and inputs[0].device.type == "cuda"
-            and (use_fallback is not True)
-        ):
-            if self.f_cuda3 is not None:
-                return self.f_cuda3(inputs[0], inputs[1])
-            else:
-                return self.f_cuda4(inputs[0], inputs[1], inputs[2])
-
-        if use_fallback is False:
-            if self.f_cuda3 is not None and self.f_cuda4 is not None:
-                raise RuntimeError("CUDA kernel available but input is not on CUDA")
-            else:
-                raise RuntimeError("No CUDA kernel available")
-
-        if self._optimize_fallback is None:
-            warnings.warn(
-                "The fallback method is used but it has not been optimized. "
-                "Consider setting optimize_fallback=True when creating the TensorProduct module."
-            )
-        if self.f_fx is None:
-                raise RuntimeError("No fallback method available")
-        return self.f_fx(inputs)
+        return self.f(inputs)
 
 
 def _tensor_product_fx(
@@ -404,9 +382,9 @@ def _tensor_product_cuda(
                 operand_num_segments=[o.num_segments for o in d.operands],
             ):
                 if descriptor.num_operands == 3:
-                    return TensorProductUniform3x1d(d, device, math_dtype), None
+                    return TensorProductUniform3x1d(d, device, math_dtype)
                 else:
-                    return None, TensorProductUniform4x1d(d, device, math_dtype)
+                    return TensorProductUniform4x1d(d, device, math_dtype)
 
     supported_targets = [
         stp.Subscripts(subscripts)
@@ -436,9 +414,9 @@ def _tensor_product_cuda(
         )
 
     if descriptor.num_operands == 3:
-        return FusedTensorProductOp3(descriptor, perm[:2], device, math_dtype), None
+        return FusedTensorProductOp3(descriptor, perm[:2], device, math_dtype)
     elif descriptor.num_operands == 4:
-        return None, FusedTensorProductOp4(descriptor, perm[:3], device, math_dtype)
+        return FusedTensorProductOp4(descriptor, perm[:3], device, math_dtype)
 
                         
 def _reshape(x: torch.Tensor, leading_shape: List[int]) -> torch.Tensor:
@@ -489,10 +467,9 @@ class FusedTensorProductOp3(torch.nn.Module):
 
     def forward(
         self,
-        x0: torch.Tensor,
-        x1: torch.Tensor,
+        inputs: List[torch.Tensor]
     ) -> torch.Tensor:
-        x0, x1 = self._perm(x0, x1)
+        x0, x1 = self._perm(inputs[0], inputs[1])
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
 
@@ -548,11 +525,9 @@ class FusedTensorProductOp4(torch.nn.Module):
 
     def forward(
         self,
-        x0: torch.Tensor,
-        x1: torch.Tensor,
-        x2: torch.Tensor,
+        inputs: List[torch.Tensor]
     ) -> torch.Tensor:
-        x0, x1, x2 = self._perm(x0, x1, x2)
+        x0, x1, x2 = self._perm(inputs[0], inputs[1], inputs[2])
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
         assert x2.ndim >= 1, x2.ndim
@@ -601,7 +576,8 @@ class TensorProductUniform3x1d(torch.nn.Module):
     def __repr__(self):
         return f"TensorProductUniform3x1d({self.descriptor} (output last operand))"
 
-    def forward(self, x0:torch.Tensor, x1:torch.Tensor):
+    def forward(self, inputs: List[torch.Tensor]):
+        x0, x1 = inputs
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
 
@@ -653,7 +629,8 @@ class TensorProductUniform4x1d(torch.nn.Module):
     def __repr__(self):
         return f"TensorProductUniform4x1d({self.descriptor} (output last operand))"
 
-    def forward(self, x0, x1, x2):
+    def forward(self, inputs: List[torch.Tensor]):
+        x0, x1, x2 = inputs
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
         assert x2.ndim >= 1, x2.ndim
