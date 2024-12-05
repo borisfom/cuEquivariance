@@ -26,6 +26,31 @@ class Dispatcher(torch.nn.Module):
         super().__init__()
         self.tp = tp
 
+class Transpose1Dispatcher(Dispatcher):
+    def forward(
+        self,
+        inputs: List[torch.Tensor]
+    ):
+        inputs[0] = self.tp[0](inputs[0])
+
+class Transpose2Dispatcher(Dispatcher):
+    def forward(
+        self,
+        inputs: List[torch.Tensor]
+    ):
+        inputs[0] = self.tp[0](inputs[0])
+        inputs[1] = self.tp[1](inputs[1])
+
+class Transpose3Dispatcher(Dispatcher):
+    def forward(
+        self,
+        inputs: List[torch.Tensor]
+    ):
+        inputs[0] = self.tp[0](inputs[0])
+        inputs[1] = self.tp[1](inputs[1])
+        inputs[2] = self.tp[2](inputs[2])
+
+TRANSPOSE_DISPATCHERS = [Transpose1Dispatcher, Transpose2Dispatcher, Transpose3Dispatcher]
 
 class TPDispatcher(Dispatcher):
     def forward(
@@ -61,16 +86,9 @@ class IWeightedSymmetricTPDispatcher(Dispatcher):
                 x0.ndim == 2,
                 f"Expected x0 to have shape (batch, dim), got {x0.shape}",
             )
-            if x0.shape[0] == 1:
-                indices = torch.zeros(
-                    (x1.shape[0],), dtype=torch.int32, device=x1.device
-                )
-            else:  #  x0.shape[0] == x1.shape[0]:
-                indices = torch.arange(
-                    x1.shape[0], dtype=torch.int32, device=x1.device
-                )
-        # borisf : why was it here ?
-        # if indices is not None:
+            indices = torch.arange(
+                x1.shape[0], dtype=torch.int32, device=x1.device
+            )
         return self.tp(x0, indices, x1)
 
 class EquivariantTensorProduct(torch.nn.Module):
@@ -140,9 +158,9 @@ class EquivariantTensorProduct(torch.nn.Module):
         self.layout_in = layout_in = tuple(map(default_layout, layout_in))
         self.layout_out = layout_out = default_layout(layout_out)
 
-        self.transpose_in = torch.nn.ModuleList()
+        transpose_in = torch.nn.ModuleList()
         for layout_used, input_expected in zip(layout_in, e.inputs):
-            self.transpose_in.append(
+            transpose_in.append(
                 cuet.TransposeIrrepsLayout(
                     input_expected.irreps,
                     source=layout_used,
@@ -151,6 +169,9 @@ class EquivariantTensorProduct(torch.nn.Module):
                     use_fallback = use_fallback
                 )
             )
+        # script() requires literal addressing and fails to eliminate dead branches
+        self.transpose_in = TRANSPOSE_DISPATCHERS[len(transpose_in)-1](transpose_in)
+        
         self.transpose_out = cuet.TransposeIrrepsLayout(
             e.output.irreps,
             source=e.output.layout,
@@ -212,9 +233,7 @@ class EquivariantTensorProduct(torch.nn.Module):
             assert a.shape[-1] == dim
 
         # Transpose inputs
-        inputs[0] = self.transpose_in[0](inputs[0])
-        if len(self.transpose_in) > 1:
-            inputs[1] = self.transpose_in[1](inputs[1])
+        self.transpose_in.forward(inputs)
 
         # Compute tensor product
         output = self.tp(inputs, indices)

@@ -19,7 +19,6 @@ from typing import List, Optional, OrderedDict, Tuple
 
 import torch
 import torch.fx
-from torch.jit import Final
 from cuequivariance import segmented_tensor_product as stp
 
 logger = logging.getLogger(__name__)

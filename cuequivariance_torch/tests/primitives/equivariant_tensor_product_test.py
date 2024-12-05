@@ -187,14 +187,14 @@ def test_script(
 
     m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir,
                                       use_fallback=False,
-                                      device="cuda",
-                                      optimize_fallback=False)
+                                      device="cuda")
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
         for inp in e.inputs
     ]
+    copy_inputs = [i.clone() for i in inputs]
     res = m(inputs)
     m_script = torch.jit.script(m)
-    # res_script = m_script(inputs)
-    # torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
+    res_script = m_script(copy_inputs)
+    torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
 

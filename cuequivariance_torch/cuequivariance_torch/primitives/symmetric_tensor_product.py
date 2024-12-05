@@ -85,6 +85,7 @@ class SymmetricTensorProduct(torch.nn.Module):
             descriptors,
             device=device,
             math_dtype=math_dtype,
+            use_fallback = use_fallback,
             optimize_fallback=optimize_fallback,
         )
 
@@ -153,7 +154,7 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
         self.x2_size = d.operands[-1].size
         self.has_cuda = False
         
-        if not use_fallback == True:
+        if use_fallback is None or not use_fallback:
             try:
                 self.f = CUDAKernel(descriptors, device, math_dtype)
                 self.has_cuda = True
@@ -163,15 +164,15 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
             except ImportError as e:
                 logger.warning(f"Failed to initialize CUDA implementation: {e}")
                 
-        if use_fallback == False:
-            raise RuntimeError("`use_fallback` is `False` and no CUDA kernel is available")
-        else:
+        if use_fallback is None or use_fallback:
             self.f = FallbackImpl(
                 descriptors,
                 device,
                 math_dtype=math_dtype,
                 optimize_fallback=optimize_fallback,
             )
+        else:
+            raise RuntimeError("`use_fallback` is `False` and no CUDA kernel is available")
 
     def __repr__(self):
         has_cuda_kernel = (
