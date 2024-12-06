@@ -38,6 +38,7 @@ def test_linear_fwd(
     layout: cue.IrrepsLayout,
     shared_weights: bool,
 ):
+    torch.manual_seed(0)
     linear = cuet.Linear(
         irreps_in,
         irreps_out,
@@ -47,6 +48,8 @@ def test_linear_fwd(
         dtype=torch.float64,
         use_fallback=False,
     )
+
+    torch.manual_seed(0)
     linear_fx = cuet.Linear(
         irreps_in,
         irreps_out,
@@ -83,6 +86,7 @@ def test_linear_bwd_bwd(
 ):
     outputs = dict()
     for use_fallback in [True, False]:
+        torch.manual_seed(0)
         linear = cuet.Linear(
             irreps_in,
             irreps_out,
