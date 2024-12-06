@@ -103,7 +103,7 @@ class TensorProduct(torch.nn.Module):
         self.f = None
         self.has_cuda = False
 
-        if not use_fallback == True:
+        if use_fallback is None or use_fallback is False:
             try:
                 self.f = _tensor_product_cuda(descriptor, device, math_dtype)
                 self.has_cuda = True
@@ -119,7 +119,7 @@ class TensorProduct(torch.nn.Module):
                     "pip install cuequivariance-ops-torch-cu12"
                 )
 
-        if use_fallback == False:
+        if use_fallback is False:
             raise RuntimeError(
                 "`use_fallback` is `False` and no CUDA kernel is available!"
             )
