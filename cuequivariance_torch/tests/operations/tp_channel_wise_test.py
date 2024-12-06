@@ -59,7 +59,7 @@ def test_channel_wise(
         layout=layout,
         device="cuda",
         dtype=torch.float64,
-        use_fallback=True
+        use_fallback=True,
     )
 
     x1 = torch.randn(batch, irreps1.dim, dtype=torch.float64).cuda()
@@ -104,7 +104,7 @@ def test_channel_wise_bwd_bwd():
             layout=cue.ir_mul,
             device="cuda",
             dtype=torch.float64,
-            use_fallback=use_fallback
+            use_fallback=use_fallback,
         )
 
         (grad1, grad2, grad3) = torch.autograd.grad(

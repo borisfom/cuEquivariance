@@ -113,9 +113,13 @@ def test_primitive_tensor_product_cuda_vs_fx(
         )
         m = torch.jit.script(m)
         out1 = m(inputs)
-        
+
         m = cuet.TensorProduct(
-            d, device=device, math_dtype=torch.float64, use_fallback=True, optimize_fallback=False
+            d,
+            device=device,
+            math_dtype=torch.float64,
+            use_fallback=True,
+            optimize_fallback=False,
         )
         inputs_ = [inp.clone().to(torch.float64) for inp in inputs]
         out2 = m(inputs_)
@@ -136,4 +140,3 @@ def test_primitive_tensor_product_cuda_vs_fx(
 
         for g1, g2 in zip(double_grad1, double_grad2):
             torch.testing.assert_close(g1, g2.to(dtype), atol=100 * tol, rtol=100 * tol)
-

@@ -78,7 +78,11 @@ def test_primitive_indexed_symmetric_tensor_product_cuda_vs_fx(
 
     out1 = m(x0, i0, x1)
     m = cuet.IWeightedSymmetricTensorProduct(
-        ds, math_dtype=torch.float64, device=device, use_fallback=True, optimize_fallback=True
+        ds,
+        math_dtype=torch.float64,
+        device=device,
+        use_fallback=True,
+        optimize_fallback=True,
     )
     out2 = m(x0_, i0, x1_)
 
@@ -122,7 +126,9 @@ def test_math_dtype(
     ds = descriptors.symmetric_contraction(
         cue.Irreps("SO3", "0 + 1 + 2"), cue.Irreps("SO3", "0"), [1, 2, 3]
     ).ds
-    m = cuet.IWeightedSymmetricTensorProduct(ds, math_dtype=math_dtype, device=device, use_fallback=False)
+    m = cuet.IWeightedSymmetricTensorProduct(
+        ds, math_dtype=math_dtype, device=device, use_fallback=False
+    )
     x0 = torch.randn((20, m.x0_size), dtype=dtype, device=device)
     i0 = torch.randint(0, m.x0_size, (1000,), dtype=torch.int32, device=device)
     x1 = torch.randn((i0.size(0), m.x1_size), dtype=dtype, device=device)

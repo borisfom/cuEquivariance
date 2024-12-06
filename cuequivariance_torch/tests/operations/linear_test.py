@@ -45,7 +45,7 @@ def test_linear_fwd(
         shared_weights=shared_weights,
         device="cuda",
         dtype=torch.float64,
-        use_fallback=False
+        use_fallback=False,
     )
     linear_fx = cuet.Linear(
         irreps_in,
@@ -54,7 +54,7 @@ def test_linear_fwd(
         shared_weights=shared_weights,
         device="cuda",
         dtype=torch.float64,
-        use_fallback=True
+        use_fallback=True,
     )
     x = torch.randn(10, irreps_in.dim, dtype=torch.float64).cuda()
 
@@ -90,7 +90,7 @@ def test_linear_bwd_bwd(
             shared_weights=shared_weights,
             device="cuda",
             dtype=torch.float64,
-            use_fallback=use_fallback
+            use_fallback=use_fallback,
         )
 
         # reset the seed to ensure the same initialization

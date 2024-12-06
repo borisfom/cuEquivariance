@@ -77,7 +77,7 @@ def test_performance_cuda_vs_fx(
         math_dtype=math_dtype,
         use_fallback=False,
     )
-    
+
     m1 = cuet.EquivariantTensorProduct(
         e,
         layout=cue.ir_mul,
@@ -141,11 +141,7 @@ def test_precision_cuda_vs_fx(
         for inp in e.inputs
     ]
     m = cuet.EquivariantTensorProduct(
-        e,
-        layout=cue.ir_mul,
-        device=device,
-        math_dtype=math_dtype,
-        use_fallback=False
+        e, layout=cue.ir_mul, device=device, math_dtype=math_dtype, use_fallback=False
     )
     y0 = m(inputs)
 
@@ -174,9 +170,9 @@ def test_compile(
 ):
     device = torch.device("cuda:0")
 
-    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir,
-                                      use_fallback=False,
-                                      device="cuda")
+    m = cuet.EquivariantTensorProduct(
+        e, layout=cue.mul_ir, use_fallback=False, device="cuda"
+    )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
         for inp in e.inputs
@@ -185,6 +181,7 @@ def test_compile(
     m_compile = torch.compile(m, fullgraph=True)
     res_script = m_compile(inputs)
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
+
 
 @pytest.mark.parametrize("e", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
@@ -198,9 +195,9 @@ def test_script(
 
     device = torch.device("cuda:0")
 
-    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir,
-                                      use_fallback=False,
-                                      device="cuda")
+    m = cuet.EquivariantTensorProduct(
+        e, layout=cue.mul_ir, use_fallback=False, device="cuda"
+    )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
         for inp in e.inputs
@@ -209,4 +206,3 @@ def test_script(
     m_script = torch.jit.script(m)
     res_script = m_script(inputs)
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
-

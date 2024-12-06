@@ -23,11 +23,13 @@ from cuequivariance import segmented_tensor_product as stp
 
 logger = logging.getLogger(__name__)
 
+
 def prod(numbers: List[int]):
     product = 1
     for num in numbers:
         product *= num
     return product
+
 
 def broadcast_shapes(shapes: List[List[int]]):
     if torch.jit.is_scripting():
@@ -47,15 +49,23 @@ def broadcast_shapes(shapes: List[List[int]]):
             if isinstance(shape, (tuple, list)):
                 for i in range(-1, -1 - len(shape), -1):
                     if shape[i] < 0:
-                        raise RuntimeError("Trying to create tensor with negative dimension ({}): ({})"
-                                           .format(shape[i], shape[i]))
+                        raise RuntimeError(
+                            "Trying to create tensor with negative dimension ({}): ({})".format(
+                                shape[i], shape[i]
+                            )
+                        )
                     if shape[i] == 1 or shape[i] == result[i]:
                         continue
                     if result[i] != 1:
-                        raise RuntimeError("Shape mismatch: objects cannot be broadcast to a single shape")
+                        raise RuntimeError(
+                            "Shape mismatch: objects cannot be broadcast to a single shape"
+                        )
                     result[i] = shape[i]
             else:
-                raise RuntimeError("Input shapes should be of type ints, a tuple of ints, or a list of ints, got ", shape)
+                raise RuntimeError(
+                    "Input shapes should be of type ints, a tuple of ints, or a list of ints, got ",
+                    shape,
+                )
         return torch.Size(result)
     else:
         return torch.functional.broadcast_shapes(*shapes)
@@ -76,6 +86,7 @@ class TensorProduct(torch.nn.Module):
             RuntimeError: If `use_fallback` is `False` and no CUDA kernel is available.
 
     """
+
     def __init__(
         self,
         descriptor: stp.SegmentedTensorProduct,
@@ -91,8 +102,8 @@ class TensorProduct(torch.nn.Module):
             math_dtype = torch.get_default_dtype()
         self.f = None
         self.has_cuda = False
-        
-        if not use_fallback == True: 
+
+        if not use_fallback == True:
             try:
                 self.f = _tensor_product_cuda(descriptor, device, math_dtype)
                 self.has_cuda = True
@@ -107,9 +118,11 @@ class TensorProduct(torch.nn.Module):
                     "pip install cuequivariance-ops-torch-cu11\n"
                     "pip install cuequivariance-ops-torch-cu12"
                 )
-                
-        if use_fallback == False: 
-            raise RuntimeError("`use_fallback` is `False` and no CUDA kernel is available!")
+
+        if use_fallback == False:
+            raise RuntimeError(
+                "`use_fallback` is `False` and no CUDA kernel is available!"
+            )
         else:
             self.f = _tensor_product_fx(
                 descriptor, device, math_dtype, optimize_fallback is True
@@ -118,7 +131,7 @@ class TensorProduct(torch.nn.Module):
                 warnings.warn(
                     "The fallback method is used but it has not been optimized. "
                     "Consider setting optimize_fallback=True when creating the TensorProduct module."
-                )    
+                )
             self._optimize_fallback = optimize_fallback
 
     def __repr__(self):
@@ -216,9 +229,7 @@ def _tensor_product_fx(
 
             seg_shape = descriptor.get_segment_shape(-1, path)
             outputs += [
-                out.reshape(
-                    out.shape[: out.ndim - len(seg_shape)] + (prod(seg_shape),)
-                )
+                out.reshape(out.shape[: out.ndim - len(seg_shape)] + (prod(seg_shape),))
             ]
 
         if len(outputs) == 0:
@@ -305,7 +316,7 @@ class _Wrapper(torch.nn.Module):
         self.module = module
         self.descriptor = descriptor
 
-    def forward(self, args:List[torch.Tensor]):
+    def forward(self, args: List[torch.Tensor]):
         if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             for oid, arg in enumerate(args):
                 torch._assert(
@@ -417,7 +428,7 @@ def _tensor_product_cuda(
     elif descriptor.num_operands == 4:
         return FusedTensorProductOp4(descriptor, perm[:3], device, math_dtype)
 
-                        
+
 def _reshape(x: torch.Tensor, leading_shape: List[int]) -> torch.Tensor:
     # Make x have shape (Z, x.shape[-1]) or (x.shape[-1],)
     if prod(leading_shape) > 1 and prod(x.shape[:-1]) == 1:
@@ -464,10 +475,7 @@ class FusedTensorProductOp3(torch.nn.Module):
     def __repr__(self) -> str:
         return f"FusedTensorProductOp3({self.descriptor} (output last operand))"
 
-    def forward(
-        self,
-        inputs: List[torch.Tensor]
-    ) -> torch.Tensor:
+    def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1 = self._perm(inputs[0], inputs[1])
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
@@ -522,10 +530,7 @@ class FusedTensorProductOp4(torch.nn.Module):
     def __repr__(self) -> str:
         return f"FusedTensorProductOp4({self.descriptor} (output last operand))"
 
-    def forward(
-        self,
-        inputs: List[torch.Tensor]
-    ) -> torch.Tensor:
+    def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1, x2 = self._perm(inputs[0], inputs[1], inputs[2])
         assert x0.ndim >= 1, x0.ndim
         assert x1.ndim >= 1, x1.ndim
@@ -544,6 +549,7 @@ class FusedTensorProductOp4(torch.nn.Module):
         out = self._f(x0, x1, x2)
 
         return out.reshape(shape + (out.shape[-1],))
+
 
 class TensorProductUniform1d(torch.nn.Module):
     def __init__(
@@ -570,6 +576,7 @@ class TensorProductUniform1d(torch.nn.Module):
             path_coefficients=[float(path.coefficients) for path in descriptor.paths],
             math_dtype=math_dtype,
         ).to(device=device)
+
 
 class TensorProductUniform3x1d(TensorProductUniform1d):
     def __repr__(self):
