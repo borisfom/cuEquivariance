@@ -90,13 +90,14 @@ class TransposeSegments(torch.nn.Module):
         super().__init__()
 
         info = _transpose_info(segments, device=device)
+        self.f = None
 
         if info is not None:
             if use_fallback is False or use_fallback is None:
                 try:
                     import cuequivariance_ops_torch  # noqa: F401
                 except ImportError:
-                    self.f = None
+                    pass
                 else:
                     self.f = _transpose(info).to(device=device)
 
