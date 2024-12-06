@@ -150,7 +150,9 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
         self.x0_size = d.operands[0].size
         self.x1_size = d.operands[1].size
         self.x2_size = d.operands[-1].size
+
         self.has_cuda = False
+        self.f = None
 
         if use_fallback is None or use_fallback is False:
             try:
