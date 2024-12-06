@@ -71,14 +71,15 @@ class SymmetricContraction(torch.nn.Module):
         ...     layout_out=cue.mul_ir,
         ...     original_mace=True,
         ...     dtype=torch.float64,
+        ...     device=torch.device("cuda"),
         ... )
 
         Then the execution is as follows:
 
-        >>> node_feats = torch.randn(128, 32, feats_irreps.dim // 32, dtype=torch.float64)
+        >>> node_feats = torch.randn(128, 32, feats_irreps.dim // 32, dtype=torch.float64).cuda()
         >>> # with node_attrs_index being the index version of node_attrs, sth like:
         >>> # node_attrs_index = torch.nonzero(node_attrs)[:, 1].int()
-        >>> node_attrs_index = torch.randint(0, 10, (128,), dtype=torch.int32)
+        >>> node_attrs_index = torch.randint(0, 10, (128,), dtype=torch.int32).cuda()
         >>> # OLD CALL:
         >>> # symmetric_contractions_old(node_feats, node_attrs)
         >>> # NEW CALL:

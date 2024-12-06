@@ -72,27 +72,7 @@ class FullyConnectedTensorProductConv(nn.Module):
         >>> conv1 = FullyConnectedTensorProductConv(in_irreps, sh_irreps, out_irreps,
         ...     mlp_channels=[6, 16, 16], mlp_activation=nn.ReLU(), layout=cue.ir_mul).cuda()
         >>> conv1
-        FullyConnectedTensorProductConv(
-          (tp): FullyConnectedTensorProduct(
-            shared_weights=False, internal_weights=False, weight_numel=64
-            (f): EquivariantTensorProduct(
-              EquivariantTensorProduct(64x0e x 4x0e+4x1o x 0e+1o -> 4x0e+4x1o)
-              (transpose_in): ModuleList(
-                (0-2): 3 x TransposeIrrepsLayout((irrep,mul) -> (irrep,mul))
-              )
-              (transpose_out): TransposeIrrepsLayout((irrep,mul) -> (irrep,mul))
-              (tp): TensorProduct(uvw,iu,jv,kw+ijk sizes=64,16,4,16 num_segments=4,2,2,2 num_paths=4 i={1, 3} j={1, 3} k={1, 3} u=4 v=1 w=4 (with CUDA kernel))
-            )
-          )
-          (batch_norm): BatchNorm(4x0e+4x1o, layout=(irrep,mul), eps=1e-05, momentum=0.1)
-          (mlp): Sequential(
-            (0): Linear(in_features=6, out_features=16, bias=True)
-            (1): ReLU()
-            (2): Linear(in_features=16, out_features=16, bias=True)
-            (3): ReLU()
-            (4): Linear(in_features=16, out_features=64, bias=True)
-          )
-        )
+        FullyConnectedTensorProductConv(...)
         >>> # out = conv1(src_features, edge_sh, edge_emb, graph)
 
         **Case 2**: If edge_emb is constructed by concatenating scalar features from
