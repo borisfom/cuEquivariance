@@ -107,7 +107,6 @@ class TensorProduct(torch.nn.Module):
             try:
                 self.f = _tensor_product_cuda(descriptor, device, math_dtype)
                 self.has_cuda = True
-                return
             except NotImplementedError as e:
                 logger.info(f"CUDA implementation not available: {e}")
             except ImportError as e:
@@ -119,19 +118,22 @@ class TensorProduct(torch.nn.Module):
                     "pip install cuequivariance-ops-torch-cu12"
                 )
 
-        if use_fallback is False:
+        if use_fallback is False and not self.has_cuda:
             raise RuntimeError(
                 "`use_fallback` is `False` and no CUDA kernel is available!"
             )
-        else:
-            self.f = _tensor_product_fx(
-                descriptor, device, math_dtype, optimize_fallback is True
-            )
+
+        if self.f is None:
             if optimize_fallback is None:
+                optimize_fallback = False
                 warnings.warn(
                     "The fallback method is used but it has not been optimized. "
                     "Consider setting optimize_fallback=True when creating the TensorProduct module."
                 )
+
+            self.f = _tensor_product_fx(
+                descriptor, device, math_dtype, optimize_fallback
+            )
             self._optimize_fallback = optimize_fallback
 
     def __repr__(self):

@@ -92,16 +92,20 @@ class TransposeSegments(torch.nn.Module):
         info = _transpose_info(segments, device=device)
 
         if info is not None:
-            try:
-                import cuequivariance_ops_torch  # noqa: F401
-            except ImportError:
-                self.f_cuda = None
-            else:
-                self.f_cuda = _transpose(info).to(device=device)
-            if use_fallback:
+            if use_fallback is False or use_fallback is None:
+                try:
+                    import cuequivariance_ops_torch  # noqa: F401
+                except ImportError:
+                    self.f = None
+                else:
+                    self.f = _transpose(info).to(device=device)
+
+            if use_fallback is False and self.f is None:
+                raise RuntimeError("CUDA kernel not available for TransposeSegments.")
+
+            if self.f is None:
                 self.f = _transpose_segments_fx(segments).to(device=device)
         else:
-            self.f_cuda = torch.nn.Identity()
             self.f = torch.nn.Identity()
 
     def __repr__(self):
@@ -130,10 +134,7 @@ class TransposeSegments(torch.nn.Module):
         RuntimeError
             If `use_fallback` is `False` and a CUDA kernel is not available or the input is not on CUDA.
         """
-        if self.f_cuda is not None:
-            return self.f_cuda(x)
-        else:
-            return self.f(x)
+        return self.f(x)
 
 
 def _transpose_segments_fx(segments: list[tuple[int, int]]) -> torch.nn.Module:
