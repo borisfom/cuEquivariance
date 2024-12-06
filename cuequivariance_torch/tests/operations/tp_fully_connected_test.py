@@ -47,7 +47,7 @@ def test_fully_connected(
         layout=layout,
         device="cuda",
         dtype=torch.float64,
-        use_fallback=use_fallback
+        use_fallback=use_fallback,
     )
 
     x1 = torch.randn(32, irreps1.dim, dtype=torch.float64).cuda()
@@ -74,7 +74,7 @@ def test_compile():
         irreps_out=cue.Irreps("O3", "32x0e + 32x1o"),
         layout=cue.mul_ir,
         device=device,
-        use_fallback=False
+        use_fallback=False,
     )
 
     m_compile = torch.compile(m, fullgraph=True)

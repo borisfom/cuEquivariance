@@ -36,19 +36,21 @@ class TransposeIrrepsLayout(torch.nn.Module):
         source: cue.IrrepsLayout,
         target: cue.IrrepsLayout,
         device: Optional[torch.device] = None,
-        use_fallback: Optional[bool] = False
+        use_fallback: Optional[bool] = False,
     ):
         super().__init__()
 
         if (source, target) == (cue.mul_ir, cue.ir_mul):
             self.f = TransposeSegments(
-                [(mul, ir.dim) for mul, ir in irreps], device=device,
-                use_fallback = use_fallback
+                [(mul, ir.dim) for mul, ir in irreps],
+                device=device,
+                use_fallback=use_fallback,
             )
         elif (source, target) == (cue.ir_mul, cue.mul_ir):
             self.f = TransposeSegments(
-                [(ir.dim, mul) for mul, ir in irreps], device=device,
-                use_fallback = use_fallback
+                [(ir.dim, mul) for mul, ir in irreps],
+                device=device,
+                use_fallback=use_fallback,
             )
         else:
             self.f = torch.nn.Identity()
@@ -61,9 +63,7 @@ class TransposeIrrepsLayout(torch.nn.Module):
     def __repr__(self):
         return f"TransposeIrrepsLayout({self.source} -> {self.target})"
 
-    def forward(
-        self, x: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         r"""
         Perform the transposition.
 
@@ -82,8 +82,10 @@ class TransposeIrrepsLayout(torch.nn.Module):
 
 class TransposeSegments(torch.nn.Module):
     def __init__(
-            self, segments: list[tuple[int, int]], device: Optional[torch.device] = None,
-            use_fallback: Optional[bool] = False
+        self,
+        segments: list[tuple[int, int]],
+        device: Optional[torch.device] = None,
+        use_fallback: Optional[bool] = False,
     ):
         super().__init__()
 
@@ -105,9 +107,7 @@ class TransposeSegments(torch.nn.Module):
     def __repr__(self):
         return "TransposeSegments()"
 
-    def forward(
-        self, x: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Perform the transposition of the input tensor using either a CUDA kernel or a PyTorch fallback.
 
