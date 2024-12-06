@@ -541,7 +541,7 @@ class FusedTensorProductOp4(torch.nn.Module):
         x1 = _reshape(x1, shape)
         x2 = _reshape(x2, shape)
 
-        if not torch.jit.is_scripting and not torch.compiler.is_compiling():
+        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
@@ -607,7 +607,6 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
 
 
 class TensorProductUniform4x1d(TensorProductUniform1d):
-
     def __repr__(self):
         return f"TensorProductUniform4x1d({self.descriptor} (output last operand))"
 
