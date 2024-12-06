@@ -306,7 +306,7 @@ class _Wrapper(torch.nn.Module):
         self.descriptor = descriptor
 
     def forward(self, args:List[torch.Tensor]):
-        if not torch.jit.is_scripting():
+        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             for oid, arg in enumerate(args):
                 torch._assert(
                     arg.shape[-1] == self.descriptor.operands[oid].size,
@@ -476,7 +476,7 @@ class FusedTensorProductOp3(torch.nn.Module):
         x0 = _reshape(x0, shape)
         x1 = _reshape(x1, shape)
 
-        if not torch.jit.is_scripting():
+        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling FusedTensorProductOp3: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
@@ -536,7 +536,7 @@ class FusedTensorProductOp4(torch.nn.Module):
         x1 = _reshape(x1, shape)
         x2 = _reshape(x2, shape)
 
-        if not torch.jit.is_scripting():
+        if not torch.jit.is_scripting and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
@@ -589,7 +589,7 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
         if x1.ndim == 1:
             x1 = x1.unsqueeze(0)
 
-        if not torch.jit.is_scripting():
+        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
@@ -622,7 +622,7 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
         if x2.ndim == 1:
             x2 = x2.unsqueeze(0)
 
-        if not torch.jit.is_scripting():
+        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling TensorProductUniform4x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )

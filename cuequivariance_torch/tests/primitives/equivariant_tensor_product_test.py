@@ -163,15 +163,28 @@ def test_precision_cuda_vs_fx(
     torch.testing.assert_close(y0, y1, atol=atol, rtol=rtol)
 
 
-def test_compile():
-    e = cue.descriptors.symmetric_contraction(
-        cue.Irreps("O3", "32x0e + 32x1o"), cue.Irreps("O3", "32x0e + 32x1o"), [1, 2, 3]
-    )
-    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir, device="cuda", optimize_fallback=False)
+@pytest.mark.parametrize("e", make_descriptors())
+@pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
+def test_compile(
+    e: cue.EquivariantTensorProduct,
+    dtype: torch.dtype,
+    math_dtype: torch.dtype,
+    atol: float,
+    rtol: float,
+):
+    device = torch.device("cuda:0")
+
+    m = cuet.EquivariantTensorProduct(e, layout=cue.mul_ir,
+                                      use_fallback=False,
+                                      device="cuda")
+    inputs = [
+        torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
+        for inp in e.inputs
+    ]
+    res = m(inputs)
     m_compile = torch.compile(m, fullgraph=True)
-    input1 = torch.randn(100, e.inputs[0].irreps.dim).cuda()
-    input2 = torch.randn(100, e.inputs[1].irreps.dim).cuda()
-    m_compile([input1, input2])
+    res_script = m_compile(inputs)
+    torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
 
 @pytest.mark.parametrize("e", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)

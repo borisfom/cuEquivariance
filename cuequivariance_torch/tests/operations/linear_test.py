@@ -45,16 +45,26 @@ def test_linear_fwd(
         shared_weights=shared_weights,
         device="cuda",
         dtype=torch.float64,
+        use_fallback=False
+    )
+    linear_fx = cuet.Linear(
+        irreps_in,
+        irreps_out,
+        layout=layout,
+        shared_weights=shared_weights,
+        device="cuda",
+        dtype=torch.float64,
+        use_fallback=True
     )
     x = torch.randn(10, irreps_in.dim, dtype=torch.float64).cuda()
 
     if shared_weights:
         y = linear(x)
-        y_fx = linear(x, use_fallback=True)
+        y_fx = linear_fx(x)
     else:
         w = torch.randn(10, linear.weight_numel, dtype=torch.float64).cuda()
         y = linear(x, w)
-        y_fx = linear(x, w, use_fallback=True)
+        y_fx = linear_fx(x, w)
 
     assert y.shape == (10, irreps_out.dim)
 
@@ -71,17 +81,18 @@ def test_linear_bwd_bwd(
     layout: cue.IrrepsLayout,
     shared_weights: bool,
 ):
-    linear = cuet.Linear(
-        irreps_in,
-        irreps_out,
-        layout=layout,
-        shared_weights=shared_weights,
-        device="cuda",
-        dtype=torch.float64,
-    )
-
     outputs = dict()
     for use_fallback in [True, False]:
+        linear = cuet.Linear(
+            irreps_in,
+            irreps_out,
+            layout=layout,
+            shared_weights=shared_weights,
+            device="cuda",
+            dtype=torch.float64,
+            use_fallback=use_fallback
+        )
+
         # reset the seed to ensure the same initialization
         torch.manual_seed(0)
 
@@ -90,12 +101,12 @@ def test_linear_bwd_bwd(
         )
 
         if shared_weights:
-            y = linear(x, use_fallback=use_fallback)
+            y = linear(x)
         else:
             w = torch.randn(
                 10, linear.weight_numel, requires_grad=True, dtype=torch.float64
             ).cuda()
-            y = linear(x, w, use_fallback=use_fallback)
+            y = linear(x, w)
 
         (grad,) = torch.autograd.grad(
             y.pow(2).sum(),

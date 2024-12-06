@@ -53,10 +53,22 @@ class Transpose3Dispatcher(Dispatcher):
         ret = inputs.copy()
         ret[0] = self.tp[0](ret[0])
         ret[1] = self.tp[1](ret[1])
-        ret[2] = self.tp[1](ret[2])
+        ret[2] = self.tp[2](ret[2])
         return ret
 
-TRANSPOSE_DISPATCHERS = [Transpose1Dispatcher, Transpose2Dispatcher, Transpose3Dispatcher]
+class Transpose4Dispatcher(Dispatcher):
+    def forward(
+        self,
+        inputs: List[torch.Tensor]
+    ):
+        ret = inputs.copy()
+        ret[0] = self.tp[0](ret[0])
+        ret[1] = self.tp[1](ret[1])
+        ret[2] = self.tp[2](ret[2])
+        ret[3] = self.tp[3](ret[3])
+        return ret
+
+TRANSPOSE_DISPATCHERS = [Transpose1Dispatcher, Transpose2Dispatcher, Transpose3Dispatcher, Transpose4Dispatcher]
 
 class TPDispatcher(Dispatcher):
     def forward(
@@ -175,6 +187,7 @@ class EquivariantTensorProduct(torch.nn.Module):
                     use_fallback = use_fallback
                 )
             )
+
         # script() requires literal addressing and fails to eliminate dead branches
         self.transpose_in = TRANSPOSE_DISPATCHERS[len(transpose_in)-1](transpose_in)
         
