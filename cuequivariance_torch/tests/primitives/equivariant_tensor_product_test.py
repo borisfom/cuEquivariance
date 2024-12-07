@@ -21,6 +21,9 @@ import cuequivariance as cue
 import cuequivariance_torch as cuet
 from cuequivariance import descriptors
 
+from utils import (
+    module_with_mode,
+)
 
 def make_descriptors():
     # This ETP will trigger the fusedTP kernel
@@ -171,7 +174,7 @@ def test_compile(
     device = torch.device("cuda:0")
 
     m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, use_fallback=False, device="cuda"
+        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=False, device="cuda"
     )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
@@ -196,7 +199,7 @@ def test_script(
     device = torch.device("cuda:0")
 
     m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, use_fallback=False, device="cuda"
+        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=False, device="cuda"
     )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
@@ -204,5 +207,36 @@ def test_script(
     ]
     res = m(inputs)
     m_script = torch.jit.script(m)
+    res_script = m_script(inputs)
+    torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
+
+# export_modes = ["onnx", "onnx_dynamo", "trt", "torch_trt", "jit"]
+export_modes = ["trt","onnx"]
+
+@pytest.mark.parametrize("e", make_descriptors())
+@pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
+@pytest.mark.parametrize("mode", export_modes)
+
+def test_export(
+    e: cue.EquivariantTensorProduct,
+    dtype: torch.dtype,
+    math_dtype: torch.dtype,
+    atol: float,
+    rtol: float,
+    mode: str,
+    tmp_path
+):
+
+    device = torch.device("cuda:0")
+
+    m = cuet.EquivariantTensorProduct(
+        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=False, device="cuda"
+    )
+    inputs = [
+        torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
+        for inp in e.inputs
+    ]
+    res = m(inputs)
+    m_script = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
     res_script = m_script(inputs)
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)

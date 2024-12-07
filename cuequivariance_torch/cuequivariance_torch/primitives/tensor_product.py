@@ -102,7 +102,8 @@ class TensorProduct(torch.nn.Module):
             math_dtype = torch.get_default_dtype()
         self.f = None
         self.has_cuda = False
-
+        self.num_operands = descriptor.num_operands
+        
         if not use_fallback == True:
             try:
                 self.f = _tensor_product_cuda(descriptor, device, math_dtype)
@@ -289,7 +290,7 @@ def _tensor_product_fx(
                         ),
                     )
 
-            def forward(self, *args):
+            def forward(self, args: List[torch.Tensor]):
                 shape = broadcast_shapes([arg.shape[:-1] for arg in args])
                 output = torch.zeros(
                     shape + (descriptor.operands[-1].size,),
@@ -310,10 +311,37 @@ def _tensor_product_fx(
     return _Wrapper(graphmod, descriptor)
 
 
+class _Caller(torch.nn.Module):
+    def __init__(self, module: torch.nn.Module):
+        super().__init__()
+        self.module = module
+    
+class _NoArgCaller(_Caller):
+    def forward(self, args: List[torch.Tensor]):
+        return self.module()
+
+class _OneArgCaller(_Caller):
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0])
+
+class _TwoArgCaller(_Caller):
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1])
+    
+class _ThreeArgCaller(_Caller):
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1], args[2])
+
+class _FourArgCaller(_Caller):
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1], args[2], args[3])
+
+CALL_DISPATCHERS = [_NoArgCaller, _OneArgCaller, _TwoArgCaller, _ThreeArgCaller, _FourArgCaller]
+
 class _Wrapper(torch.nn.Module):
     def __init__(self, module: torch.nn.Module, descriptor: stp.SegmentedTensorProduct):
         super().__init__()
-        self.module = module
+        self.module = CALL_DISPATCHERS[descriptor.num_operands-1](module)
         self.descriptor = descriptor
 
     def forward(self, args: List[torch.Tensor]):
@@ -336,8 +364,7 @@ class _Wrapper(torch.nn.Module):
             )
             for arg in args
         ]
-
-        out = self.module(*args)
+        out = self.module(args)
 
         return out.reshape(shape + (out.shape[-1],))
 
@@ -541,7 +568,7 @@ class FusedTensorProductOp4(torch.nn.Module):
         x1 = _reshape(x1, shape)
         x2 = _reshape(x2, shape)
 
-        if not torch.jit.is_scripting and not torch.compiler.is_compiling():
+        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )

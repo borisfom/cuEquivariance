@@ -348,6 +348,7 @@ class FallbackImpl(torch.nn.Module):
                     d,
                     device=device,
                     math_dtype=math_dtype,
+                    use_fallback=True,
                     optimize_fallback=optimize_fallback,
                 )
                 for d in stps
@@ -358,5 +359,5 @@ class FallbackImpl(torch.nn.Module):
         self, x0: torch.Tensor, i0: torch.Tensor, x1: torch.Tensor
     ) -> torch.Tensor:
         return sum(
-            f([x0[i0]] + [x1] * (f.descriptor.num_operands - 2)) for f in self.fs
+            f([x0[i0]] + [x1] * (f.num_operands - 2)) for f in self.fs
         )
