@@ -127,23 +127,19 @@ class EquivariantTensorProduct(torch.nn.Module):
         >>> e = cue.descriptors.fully_connected_tensor_product(
         ...    cue.Irreps("SO3", "2x1"), cue.Irreps("SO3", "2x1"), cue.Irreps("SO3", "2x1")
         ... )
-        >>> w = torch.ones(e.inputs[0].irreps.dim)
-        >>> x1 = torch.ones(17, e.inputs[1].irreps.dim)
-        >>> x2 = torch.ones(17, e.inputs[2].irreps.dim)
-        >>> tp = cuet.EquivariantTensorProduct(e, layout=cue.ir_mul)
+        >>> w = torch.ones(e.inputs[0].irreps.dim).cuda()
+        >>> x1 = torch.ones(17, e.inputs[1].irreps.dim).cuda()
+        >>> x2 = torch.ones(17, e.inputs[2].irreps.dim).cuda()
+        >>> tp = cuet.EquivariantTensorProduct(e, layout=cue.ir_mul, device=torch.device("cuda"))
         >>> tp([w, x1, x2])
-        tensor([[0., 0., 0., 0., 0., 0.],
-        ...
-                [0., 0., 0., 0., 0., 0.]])
+        tensor([[0., 0., 0., 0., 0., 0.],...)
 
         You can optionally index the first input tensor:
 
-        >>> w = torch.ones(3, e.inputs[0].irreps.dim)
+        >>> w = torch.ones(3, e.inputs[0].irreps.dim).cuda()
         >>> indices = torch.randint(3, (17,))
         >>> tp([w, x1, x2], indices=indices)
-        tensor([[0., 0., 0., 0., 0., 0.],
-        ...
-                [0., 0., 0., 0., 0., 0.]])
+        tensor([[0., 0., 0., 0., 0., 0.],...)
     """
 
     def __init__(

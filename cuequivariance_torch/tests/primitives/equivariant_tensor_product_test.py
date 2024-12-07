@@ -16,14 +16,18 @@ import timeit
 
 import pytest
 import torch
+import torch._dynamo
 
 import cuequivariance as cue
 import cuequivariance_torch as cuet
 from cuequivariance import descriptors
 
+
 from utils import (
     module_with_mode,
 )
+
+torch._dynamo.config.cache_size_limit = 100
 
 def make_descriptors():
     # This ETP will trigger the fusedTP kernel
@@ -174,7 +178,7 @@ def test_compile(
     device = torch.device("cuda:0")
 
     m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=False, device="cuda"
+        e, layout=cue.mul_ir, use_fallback=False, device="cuda", math_dtype=math_dtype
     )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
@@ -195,11 +199,10 @@ def test_script(
     atol: float,
     rtol: float,
 ):
-
     device = torch.device("cuda:0")
 
     m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=False, device="cuda"
+        e, layout=cue.mul_ir, use_fallback=False, device="cuda", math_dtype=math_dtype
     )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
