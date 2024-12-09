@@ -20,6 +20,8 @@ import torch
 import cuequivariance as cue
 import cuequivariance_torch as cuet
 
+device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+
 list_of_irreps = [
     cue.Irreps("SU2", "3x1/2 + 4x1"),
     cue.Irreps("SU2", "2x1/2 + 5x1 + 2x1/2"),
@@ -37,13 +39,16 @@ def test_linear_fwd(
     layout: cue.IrrepsLayout,
     shared_weights: bool,
 ):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
     torch.manual_seed(0)
     linear = cuet.Linear(
         irreps_in,
         irreps_out,
         layout=layout,
         shared_weights=shared_weights,
-        device="cuda",
+        device=device,
         dtype=torch.float64,
         use_fallback=False,
     )
@@ -54,7 +59,7 @@ def test_linear_fwd(
         irreps_out,
         layout=layout,
         shared_weights=shared_weights,
-        device="cuda",
+        device=device,
         dtype=torch.float64,
         use_fallback=True,
     )
@@ -83,6 +88,9 @@ def test_linear_bwd_bwd(
     layout: cue.IrrepsLayout,
     shared_weights: bool,
 ):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
     outputs = dict()
     for use_fallback in [True, False]:
         torch.manual_seed(0)
@@ -91,7 +99,7 @@ def test_linear_bwd_bwd(
             irreps_out,
             layout=layout,
             shared_weights=shared_weights,
-            device="cuda",
+            device=device,
             dtype=torch.float64,
             use_fallback=use_fallback,
         )
@@ -100,7 +108,7 @@ def test_linear_bwd_bwd(
         torch.manual_seed(0)
 
         x = torch.randn(
-            10, irreps_in.dim, requires_grad=True, device="cuda", dtype=torch.float64
+            10, irreps_in.dim, requires_grad=True, device=device, dtype=torch.float64
         )
 
         if shared_weights:
@@ -158,6 +166,6 @@ def test_linear_copy(
         irreps_out,
         layout=layout,
         shared_weights=shared_weights,
-    ).cuda()
+    ).to(device)
 
     copy.deepcopy(linear)

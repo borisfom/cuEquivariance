@@ -19,6 +19,7 @@ from typing import List, Optional, OrderedDict, Tuple
 
 import torch
 import torch.fx
+
 from cuequivariance import segmented_tensor_product as stp
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,7 @@ class TensorProduct(torch.nn.Module):
         self.f = None
         self.has_cuda = False
         self.num_operands = descriptor.num_operands
-        
+
         if use_fallback is None or use_fallback is False:
             try:
                 self.f = _tensor_product_cuda(descriptor, device, math_dtype)
@@ -278,9 +279,9 @@ def _tensor_product_fx(
                     for operand in descriptor.operands[:num_inputs]
                 ]
                 graphmod = opt_einsum_fx.optimize_einsums_full(graphmod, example_inputs)
-    else:
+    elif num_inputs == 0:
 
-        class _no_input_or_no_paths(torch.nn.Module):
+        class _no_input(torch.nn.Module):
             def __init__(self, descriptor: stp.SegmentedTensorProduct):
                 super().__init__()
 
@@ -292,12 +293,9 @@ def _tensor_product_fx(
                         ),
                     )
 
-            def forward(self, args: List[torch.Tensor]):
-                shape = broadcast_shapes([arg.shape[:-1] for arg in args])
+            def forward(self):
                 output = torch.zeros(
-                    shape + (descriptor.operands[-1].size,),
-                    device=device,
-                    dtype=math_dtype,
+                    (descriptor.operands[-1].size,), device=device, dtype=math_dtype
                 )
                 for pid in range(descriptor.num_paths):
                     output += torch.einsum(
@@ -308,7 +306,12 @@ def _tensor_product_fx(
                     )
                 return output
 
-        graphmod = _no_input_or_no_paths(descriptor)
+        graphmod = _no_input(descriptor)
+
+    else:
+        raise NotImplementedError(
+            "No FX implementation for empty paths and non-empty inputs"
+        )
 
     return _Wrapper(graphmod, descriptor)
 
@@ -317,33 +320,66 @@ class _Caller(torch.nn.Module):
     def __init__(self, module: torch.nn.Module):
         super().__init__()
         self.module = module
-    
+
+
 class _NoArgCaller(_Caller):
     def forward(self, args: List[torch.Tensor]):
         return self.module()
+
 
 class _OneArgCaller(_Caller):
     def forward(self, args: List[torch.Tensor]):
         return self.module(args[0])
 
+
 class _TwoArgCaller(_Caller):
     def forward(self, args: List[torch.Tensor]):
         return self.module(args[0], args[1])
-    
+
+
 class _ThreeArgCaller(_Caller):
     def forward(self, args: List[torch.Tensor]):
         return self.module(args[0], args[1], args[2])
+
 
 class _FourArgCaller(_Caller):
     def forward(self, args: List[torch.Tensor]):
         return self.module(args[0], args[1], args[2], args[3])
 
-CALL_DISPATCHERS = [_NoArgCaller, _OneArgCaller, _TwoArgCaller, _ThreeArgCaller, _FourArgCaller]
+
+class _FiveArgCaller(_Caller):
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1], args[2], args[3], args[4])
+
+
+class _SixArgCaller(_Caller):
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1], args[2], args[3], args[4], args[5])
+
+
+class _SevenArgCaller(_Caller):
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(
+            args[0], args[1], args[2], args[3], args[4], args[5], args[6]
+        )
+
+
+CALL_DISPATCHERS = [
+    _NoArgCaller,
+    _OneArgCaller,
+    _TwoArgCaller,
+    _ThreeArgCaller,
+    _FourArgCaller,
+    _FiveArgCaller,
+    _SixArgCaller,
+    _SevenArgCaller,
+]
+
 
 class _Wrapper(torch.nn.Module):
     def __init__(self, module: torch.nn.Module, descriptor: stp.SegmentedTensorProduct):
         super().__init__()
-        self.module = CALL_DISPATCHERS[descriptor.num_operands-1](module)
+        self.module = CALL_DISPATCHERS[descriptor.num_operands - 1](module)
         self.descriptor = descriptor
 
     def forward(self, args: List[torch.Tensor]):

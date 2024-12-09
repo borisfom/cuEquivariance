@@ -17,17 +17,18 @@ import timeit
 import pytest
 import torch
 import torch._dynamo
+from utils import (
+    module_with_mode,
+)
 
 import cuequivariance as cue
 import cuequivariance_torch as cuet
 from cuequivariance import descriptors
 
-
-from utils import (
-    module_with_mode,
-)
-
 torch._dynamo.config.cache_size_limit = 100
+
+device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+
 
 def make_descriptors():
     # This ETP will trigger the fusedTP kernel
@@ -61,7 +62,7 @@ settings1 = [
     (torch.float32, torch.float32),
     (torch.float64, torch.float64),
 ]
-if torch.cuda.get_device_capability()[0] >= 8:
+if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
     settings1 += [
         (torch.float16, torch.float32),
         (torch.bfloat16, torch.float32),
@@ -75,7 +76,8 @@ def test_performance_cuda_vs_fx(
     dtype: torch.dtype,
     math_dtype: torch.dtype,
 ):
-    device = torch.device("cuda:0")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
 
     m = cuet.EquivariantTensorProduct(
         e,
@@ -125,7 +127,7 @@ settings2 = [
     (torch.float64, torch.float32, 1e-5, 1e-6),
     (torch.float64, torch.float64, 1e-12, 0),
 ]
-if torch.cuda.get_device_capability()[0] >= 8:
+if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
     settings2 += [
         (torch.float16, torch.float32, 1, 0.2),
         (torch.bfloat16, torch.float32, 1, 0.2),
@@ -141,7 +143,8 @@ def test_precision_cuda_vs_fx(
     atol: float,
     rtol: float,
 ):
-    device = torch.device("cuda:0")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
 
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
@@ -175,10 +178,11 @@ def test_compile(
     atol: float,
     rtol: float,
 ):
-    device = torch.device("cuda:0")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
 
     m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, use_fallback=False, device="cuda", math_dtype=math_dtype
+        e, layout=cue.mul_ir, use_fallback=False, device=device, math_dtype=math_dtype
     )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
@@ -199,10 +203,11 @@ def test_script(
     atol: float,
     rtol: float,
 ):
-    device = torch.device("cuda:0")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
 
     m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, use_fallback=False, device="cuda", math_dtype=math_dtype
+        e, layout=cue.mul_ir, use_fallback=False, device=device, math_dtype=math_dtype
     )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
@@ -213,13 +218,14 @@ def test_script(
     res_script = m_script(inputs)
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
 
+
 # export_modes = ["onnx", "onnx_dynamo", "trt", "torch_trt", "jit"]
-export_modes = ["trt","onnx"]
+export_modes = ["trt", "onnx"]
+
 
 @pytest.mark.parametrize("e", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
 @pytest.mark.parametrize("mode", export_modes)
-
 def test_export(
     e: cue.EquivariantTensorProduct,
     dtype: torch.dtype,
@@ -227,13 +233,13 @@ def test_export(
     atol: float,
     rtol: float,
     mode: str,
-    tmp_path
+    tmp_path,
 ):
-
-    device = torch.device("cuda:0")
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
 
     m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=False, device="cuda"
+        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=False, device=device
     )
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
