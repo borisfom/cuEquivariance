@@ -70,7 +70,7 @@ class FullyConnectedTensorProductConv(nn.Module):
         having 16 channels. edge_emb.size(1) must match the size of the input layer: 6
 
         >>> conv1 = FullyConnectedTensorProductConv(in_irreps, sh_irreps, out_irreps,
-        ...     mlp_channels=[6, 16, 16], mlp_activation=nn.ReLU(), layout=cue.ir_mul).cuda()
+        ...     mlp_channels=[6, 16, 16], mlp_activation=nn.ReLU(), layout=cue.ir_mul)
         >>> conv1
         FullyConnectedTensorProductConv(...)
         >>> # out = conv1(src_features, edge_sh, edge_emb, graph)
@@ -92,7 +92,7 @@ class FullyConnectedTensorProductConv(nn.Module):
         **Case 3**: No MLP, edge_emb will be directly used as the tensor product weights:
 
         >>> conv3 = FullyConnectedTensorProductConv(in_irreps, sh_irreps, out_irreps,
-        ...     mlp_channels=None, layout=cue.ir_mul).cuda()
+        ...     mlp_channels=None, layout=cue.ir_mul)
         >>> # out = conv3(src_features, edge_sh, edge_emb, graph)
     """
 
