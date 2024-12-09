@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import *
+from typing import Union
 
 import cuequivariance as cue
 
@@ -83,3 +83,7 @@ class IrrepsLayout(Enum):
             return cue.IrrepsLayout[layout]
         except KeyError:
             raise ValueError(f"Invalid layout {layout}")
+
+
+mul_ir = IrrepsLayout.mul_ir
+ir_mul = IrrepsLayout.ir_mul

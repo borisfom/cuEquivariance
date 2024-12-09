@@ -17,7 +17,7 @@ import itertools
 import re
 from dataclasses import dataclass
 from math import factorial
-from typing import *
+from typing import Iterator
 
 import numpy as np
 
