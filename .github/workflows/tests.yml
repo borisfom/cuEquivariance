@@ -56,8 +56,8 @@ jobs:
         pytest --doctest-modules cuequivariance_jax
 
   cuequivariance-torch:
-
-    runs-on: self-hosted
+    # runs-on: self-hosted (temporary unavailable)
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
