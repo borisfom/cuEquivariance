@@ -29,7 +29,7 @@ jobs:
         python -m pip install ./cuequivariance
     - name: Test with pytest
       run: |
-        pytest --doctest-modules cuequivariance
+        pytest --doctest-modules -x cuequivariance
 
   cuequivariance-jax:
 
@@ -53,7 +53,7 @@ jobs:
         python -m pip install ./cuequivariance_jax
     - name: Test with pytest
       run: |
-        pytest --doctest-modules cuequivariance_jax
+        pytest --doctest-modules -x cuequivariance_jax
 
   cuequivariance-torch:
     # runs-on: self-hosted (temporary unavailable)
@@ -79,4 +79,4 @@ jobs:
         python -m pip install e3nn
     - name: Test with pytest
       run: |
-        pytest --doctest-modules cuequivariance_torch
+        pytest --doctest-modules -x cuequivariance_torch
