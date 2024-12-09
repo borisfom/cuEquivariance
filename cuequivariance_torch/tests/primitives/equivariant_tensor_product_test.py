@@ -14,7 +14,6 @@
 # limitations under the License.
 import os
 import timeit
-from typing import Sequence
 
 import pytest
 import torch
