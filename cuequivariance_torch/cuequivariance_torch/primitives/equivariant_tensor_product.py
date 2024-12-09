@@ -124,19 +124,20 @@ class EquivariantTensorProduct(torch.nn.Module):
         RuntimeError: If `use_fallback` is `False` and no CUDA kernel is available.
 
     Examples:
+        >>> device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         >>> e = cue.descriptors.fully_connected_tensor_product(
         ...    cue.Irreps("SO3", "2x1"), cue.Irreps("SO3", "2x1"), cue.Irreps("SO3", "2x1")
         ... )
-        >>> w = torch.ones(e.inputs[0].irreps.dim).cuda()
-        >>> x1 = torch.ones(17, e.inputs[1].irreps.dim).cuda()
-        >>> x2 = torch.ones(17, e.inputs[2].irreps.dim).cuda()
-        >>> tp = cuet.EquivariantTensorProduct(e, layout=cue.ir_mul, device=torch.device("cuda"))
+        >>> w = torch.ones(e.inputs[0].irreps.dim, device=device)
+        >>> x1 = torch.ones(17, e.inputs[1].irreps.dim, device=device)
+        >>> x2 = torch.ones(17, e.inputs[2].irreps.dim, device=device)
+        >>> tp = cuet.EquivariantTensorProduct(e, layout=cue.ir_mul, device=device)
         >>> tp([w, x1, x2])
         tensor([[0., 0., 0., 0., 0., 0.],...)
 
         You can optionally index the first input tensor:
 
-        >>> w = torch.ones(3, e.inputs[0].irreps.dim).cuda()
+        >>> w = torch.ones(3, e.inputs[0].irreps.dim, device=device)
         >>> indices = torch.randint(3, (17,))
         >>> tp([w, x1, x2], indices=indices)
         tensor([[0., 0., 0., 0., 0., 0.],...)

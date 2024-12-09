@@ -52,6 +52,7 @@ class SymmetricContraction(torch.nn.Module):
 
         The argument `original_mace` can be set to `True` to emulate the original MACE implementation.
 
+        >>> device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         >>> feats_irreps = cue.Irreps("O3", "32x0e + 32x1o + 32x2e")
         >>> target_irreps = cue.Irreps("O3", "32x0e + 32x1o")
         >>> # OLD FUNCTION DEFINITION:
@@ -71,15 +72,15 @@ class SymmetricContraction(torch.nn.Module):
         ...     layout_out=cue.mul_ir,
         ...     original_mace=True,
         ...     dtype=torch.float64,
-        ...     device=torch.device("cuda"),
+        ...     device=device,
         ... )
 
         Then the execution is as follows:
 
-        >>> node_feats = torch.randn(128, 32, feats_irreps.dim // 32, dtype=torch.float64).cuda()
+        >>> node_feats = torch.randn(128, 32, feats_irreps.dim // 32, dtype=torch.float64, device=device)
         >>> # with node_attrs_index being the index version of node_attrs, sth like:
         >>> # node_attrs_index = torch.nonzero(node_attrs)[:, 1].int()
-        >>> node_attrs_index = torch.randint(0, 10, (128,), dtype=torch.int32).cuda()
+        >>> node_attrs_index = torch.randint(0, 10, (128,), dtype=torch.int32, device=device)
         >>> # OLD CALL:
         >>> # symmetric_contractions_old(node_feats, node_attrs)
         >>> # NEW CALL:
