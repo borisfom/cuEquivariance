@@ -1,0 +1,10 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.2  # Use the latest stable version of Black
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff
+        args: ["check", "--select", "I", "--fix"]
+        exclude: __init__.py
+      - id: ruff-format

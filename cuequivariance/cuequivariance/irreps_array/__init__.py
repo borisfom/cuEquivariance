@@ -14,10 +14,7 @@
 # limitations under the License.
 from .context_irrep_class import get_irrep_scope
 from .irreps import MulIrrep, Irreps
-from .irreps_layout import IrrepsLayout
-
-mul_ir = IrrepsLayout.mul_ir
-ir_mul = IrrepsLayout.ir_mul
+from .irreps_layout import IrrepsLayout, mul_ir, ir_mul
 
 from .context_layout import get_layout_scope
 from .context_decorator import assume
