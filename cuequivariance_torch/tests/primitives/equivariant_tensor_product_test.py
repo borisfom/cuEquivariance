@@ -12,13 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 import timeit
 
 import pytest
 import torch
 import torch._dynamo
-
 from tests.utils import (
     module_with_mode,
 )
@@ -220,6 +218,7 @@ def test_script(
 
 
 export_modes = ["export", "onnx", "trt", "torch_trt", "jit"]
+
 
 @pytest.mark.parametrize("e", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
