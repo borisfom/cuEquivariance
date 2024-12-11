@@ -114,7 +114,7 @@ def module_with_mode(
         dtype = inputs[0][0].dtype
     else:
         dtype = inputs[0].dtype
-    if mode in ["trt", "torch_trt", "onnx", "onnx_dynamo", "export"]:
+    if mode in ["trt", "torch_trt", "onnx", "onnx_dynamo"]:
         if not ONNX_AVAILABLE:
             pytest.skip("ONNX not available!")
         if dtype == torch.float64 or math_dtype == torch.float64:
@@ -144,7 +144,7 @@ def module_with_mode(
             if not TORCH_TRT_AVAILABLE:
                 pytest.skip("torch_tensorrt is not installed!")
             register_plugins()
-            exp_program = torch_tensorrt.dynamo.trace(module, inputs)
+            exp_program = torch.export.export(module, tuple(inputs))
             module = torch_tensorrt.dynamo.compile(
                 exp_program,
                 inputs=inputs,
