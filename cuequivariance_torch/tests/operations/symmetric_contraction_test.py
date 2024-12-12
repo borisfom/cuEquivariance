@@ -123,34 +123,34 @@ export_modes = ["export", "onnx", "trt", "torch_trt", "jit"]
         (torch.float32, torch.float32, 1e-5, 1e-5),
     ],
 )
+@pytest.mark.parametrize("layout", [cue.ir_mul, cue.mul_ir])
+@pytest.mark.parametrize("original_mace", [True, False])
+@pytest.mark.parametrize("batch", [1, 32])
 @pytest.mark.parametrize("mode", export_modes)
-def test_export(
-    dtype: torch.dtype,
-    math_dtype: torch.dtype,
-    atol: float,
-    rtol: float,
-    mode: str,
-    tmp_path,
-):
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is not available")
+def test_export(dtype, math_dtype, atol, rtol, layout, original_mace, batch, mode, tmp_path):
+    mul = 64
+    irreps_in = mul * cue.Irreps("O3", "0e + 1o + 2e")
+    irreps_out = mul * cue.Irreps("O3", "0e + 1o")
 
     m = cuet.SymmetricContraction(
-        cue.Irreps("O3", "0e + 1o + 2e"),
-        cue.Irreps("O3", "0e + 1o"),
+        irreps_in,
+        irreps_out,
         3,
         5,
-        layout_in=cue.ir_mul,
-        layout_out=cue.mul_ir,
+        layout_in=layout,
+        layout_out=layout,
         dtype=dtype,
-        math_dtype=math_dtype,
+        math_dtype=dtype,
         device=device,
+        original_mace=original_mace,
     )
 
-    x = torch.randn((1024, 36), device=device, dtype=dtype)
-    i = torch.randint(0, 5, (1024,), dtype=torch.int32).to(device)
+    x = torch.randn((batch, irreps_in.dim), dtype=dtype).to(device)
+    indices = torch.randint(0, 5, (batch,), dtype=torch.int32).to(device)
 
-    res = m(x, i)
-    m_script = module_with_mode(mode, m, [x, i], math_dtype, tmp_path)
-    res_script = m_script(x, i)
-    torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
+    out = m(x, indices)
+    assert out.shape == (batch, irreps_out.dim)
+    
+    m_script = module_with_mode(mode, m, [x, indices], dtype, tmp_path)
+    out_script = m_script(x, indices)
+    torch.testing.assert_close(out, out_script, atol=atol, rtol=rtol)

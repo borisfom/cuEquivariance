@@ -180,10 +180,6 @@ class SymmetricContraction(torch.nn.Module):
         Returns:
             torch.Tensor: The output tensor. It has shape (batch, irreps_out.dim).
         """
-        torch._assert(
-            x.shape[-1] == self.irreps_in.dim,
-            f"Input tensor must have shape (..., {self.irreps_in.dim}), got {x.shape}",
-        )
 
         if self.projection is not None:
             weight = torch.einsum("zau,ab->zbu", self.weight, self.projection)
