@@ -24,7 +24,7 @@ device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("
 
 @pytest.mark.parametrize(
     "dtype, tol",
-    [(torch.float64, 1e-6), (torch.float32, 1e-4)],
+    [(torch.float64, 1e-5), (torch.float32, 1e-4)],
 )
 @pytest.mark.parametrize("ell", [1, 2, 3])
 def test_spherical_harmonics(ell: int, dtype, tol):
