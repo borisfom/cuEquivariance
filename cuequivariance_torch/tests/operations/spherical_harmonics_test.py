@@ -48,7 +48,7 @@ def test_spherical_harmonics(ell: int, dtype, tol):
 def test_spherical_harmonics_full():
     vec = torch.randn(3, device=device).to(device)
     ls = [0, 1, 2, 3]
-    m = cuet.SphericalHarmonics(ls).to(device)
+    m = cuet.SphericalHarmonics(ls, device=device)
     yl = m(vec)
 
     assert abs(yl[0] - 1.0) < 1e-6
