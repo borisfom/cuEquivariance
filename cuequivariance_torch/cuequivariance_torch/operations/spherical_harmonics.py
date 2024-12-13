@@ -29,6 +29,8 @@ class SphericalHarmonics(nn.Module):
         self,
         ls: list[int],
         normalize: bool = True,
+        device: Optional[torch.device] = None,
+        math_dtype: Optional[torch.dtype] = None,
         use_fallback: Optional[bool] = None,
         optimize_fallback: Optional[bool] = None,
     ):
@@ -41,18 +43,18 @@ class SphericalHarmonics(nn.Module):
                     If `True`, a PyTorch fallback method is used regardless of CUDA kernel availability.
             optimize_fallback (bool, optional): Whether to optimize fallback. Defaults to None.
         """
-        super(SphericalHarmonics, self).__init__()
+        super().__init__()
         self.ls = ls if isinstance(ls, list) else [ls]
         assert self.ls == sorted(set(self.ls))
         self.normalize = normalize
-        self.use_fallback = use_fallback
-        self.optimize_fallback = optimize_fallback
 
         self.m = cuet.EquivariantTensorProduct(
             descriptors.spherical_harmonics(cue.SO3(1), self.ls),
             layout=cue.ir_mul,
-            use_fallback=self.use_fallback,
-            optimize_fallback=self.optimize_fallback,
+            device=device,
+            math_dtype=math_dtype,
+            use_fallback=use_fallback,
+            optimize_fallback=optimize_fallback,
         )
 
     def forward(self, vectors: torch.Tensor) -> torch.Tensor:
