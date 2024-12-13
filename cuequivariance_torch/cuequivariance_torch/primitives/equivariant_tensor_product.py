@@ -245,7 +245,10 @@ class EquivariantTensorProduct(torch.nn.Module):
 
         # assert len(inputs) == len(self.etp.inputs)
         for a, dim in zip(inputs, self.operands_dims):
-            assert a.shape[-1] == dim
+            torch._assert(
+                a.shape[-1] == dim,
+                f"Expected last dimension of input to be {dim}, got {a.shape[-1]}",
+            )
 
         # Transpose inputs
         inputs = self.transpose_in(inputs)

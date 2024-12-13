@@ -127,7 +127,9 @@ export_modes = ["export", "onnx", "trt", "torch_trt", "jit"]
 @pytest.mark.parametrize("original_mace", [True, False])
 @pytest.mark.parametrize("batch", [1, 32])
 @pytest.mark.parametrize("mode", export_modes)
-def test_export(dtype, math_dtype, atol, rtol, layout, original_mace, batch, mode, tmp_path):
+def test_export(
+    dtype, math_dtype, atol, rtol, layout, original_mace, batch, mode, tmp_path
+):
     mul = 64
     irreps_in = mul * cue.Irreps("O3", "0e + 1o + 2e")
     irreps_out = mul * cue.Irreps("O3", "0e + 1o")
@@ -140,7 +142,7 @@ def test_export(dtype, math_dtype, atol, rtol, layout, original_mace, batch, mod
         layout_in=layout,
         layout_out=layout,
         dtype=dtype,
-        math_dtype=dtype,
+        math_dtype=math_dtype,
         device=device,
         original_mace=original_mace,
     )
@@ -150,7 +152,7 @@ def test_export(dtype, math_dtype, atol, rtol, layout, original_mace, batch, mod
 
     out = m(x, indices)
     assert out.shape == (batch, irreps_out.dim)
-    
+
     m_script = module_with_mode(mode, m, [x, indices], dtype, tmp_path)
     out_script = m_script(x, indices)
     torch.testing.assert_close(out, out_script, atol=atol, rtol=rtol)
