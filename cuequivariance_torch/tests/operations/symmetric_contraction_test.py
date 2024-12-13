@@ -130,6 +130,9 @@ export_modes = ["export", "onnx", "trt", "torch_trt", "jit"]
 def test_export(
     dtype, math_dtype, atol, rtol, layout, original_mace, batch, mode, tmp_path
 ):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
     mul = 64
     irreps_in = mul * cue.Irreps("O3", "0e + 1o + 2e")
     irreps_out = mul * cue.Irreps("O3", "0e + 1o")
