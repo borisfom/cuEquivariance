@@ -9,15 +9,19 @@
 # its affiliates is strictly prohibited.
 
 import os
-import pytest
-import torch
 from typing import Sequence
 
+import pytest
+import torch
+import torch._dynamo
+
+torch._dynamo.config.cache_size_limit = 100
+
 try:
-    import onnx  # noqa: F401
-    import onnxscript  # noqa: F401
-    import onnxruntime  # noqa: F401
     import cuequivariance_ops_torch.onnx  # noqa: F401
+    import onnx  # noqa: F401
+    import onnxruntime  # noqa: F401
+    import onnxscript  # noqa: F401
     from cuequivariance_ops_torch.tensorrt import register_plugins
 
     ONNX_AVAILABLE = True
@@ -39,8 +43,8 @@ def verify_onnx(module, onnx_module, inputs, dtype):
     from onnxruntime import SessionOptions
     from onnxruntime_extensions import get_library_path
     from torch.onnx.verification import (
-        _compare_onnx_pytorch_model,
         VerificationOptions,
+        _compare_onnx_pytorch_model,
     )
 
     original_init = SessionOptions.__init__
@@ -70,16 +74,16 @@ def verify_trt(module, onnx_module, inputs, dtype):
     if dtype == torch.float64:
         pytest.skip("TRT does not support float64")
 
-    from polygraphy.backend.trt import (
-        engine_from_network,
-        network_from_onnx_path,
-        TrtRunner,
-        CreateConfig,
-    )
-    from polygraphy.backend.onnxrt import OnnxrtRunner
-    from polygraphy.comparator import Comparator, DataLoader
     from onnxruntime import InferenceSession, SessionOptions
     from onnxruntime_extensions import get_library_path
+    from polygraphy.backend.onnxrt import OnnxrtRunner
+    from polygraphy.backend.trt import (
+        CreateConfig,
+        TrtRunner,
+        engine_from_network,
+        network_from_onnx_path,
+    )
+    from polygraphy.comparator import Comparator, DataLoader
 
     register_plugins()
 
