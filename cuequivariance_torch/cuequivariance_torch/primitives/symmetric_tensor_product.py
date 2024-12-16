@@ -217,7 +217,8 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
             f"Expected 2 dims (i0.max() + 1, x0_size), got shape {x0.shape}",
         )
         shape = broadcast_shapes([i0.shape, x1.shape[:-1]])
-        i0 = i0.expand(shape).reshape((prod(shape),))
+        i0 = i0.expand(shape)
+        i0 = i0.reshape((prod(shape),))
         x1 = x1.expand(shape + (x1.shape[-1],)).reshape((prod(shape), x1.shape[-1]))
 
         out = self.f(x0, i0, x1)

@@ -25,15 +25,23 @@ from cuequivariance import segmented_tensor_product as stp
 logger = logging.getLogger(__name__)
 
 
-@torch.jit.script
 def prod(numbers: List[int]):
-    product = 1
-    for num in numbers:
-        product *= num
-    return product
+    """
+    This method is a workaround for script() not recognizing math.prod()
+    """
+    if torch.jit.is_scripting():
+        product = 1
+        for num in numbers:
+            product *= num
+        return product
+    else:
+        return math.prod(numbers)
 
 
 def broadcast_shapes(shapes: List[List[int]]):
+    """
+    This method is a workaround for script() not recognizing torch.broadcast_shapes()
+    """
     if torch.jit.is_scripting():
         max_len = 0
         for shape in shapes:
@@ -543,6 +551,7 @@ class FusedTensorProductOp3(torch.nn.Module):
             math_dtype=math_dtype,
         ).to(device=device)
 
+    @torch.jit.ignore
     def __repr__(self) -> str:
         return f"FusedTensorProductOp3({self.descriptor} (output last operand))"
 
@@ -598,6 +607,7 @@ class FusedTensorProductOp4(torch.nn.Module):
             math_dtype=math_dtype,
         ).to(device=device)
 
+    @torch.jit.ignore
     def __repr__(self) -> str:
         return f"FusedTensorProductOp4({self.descriptor} (output last operand))"
 
@@ -650,6 +660,7 @@ class TensorProductUniform1d(torch.nn.Module):
 
 
 class TensorProductUniform3x1d(TensorProductUniform1d):
+    @torch.jit.ignore
     def __repr__(self):
         return f"TensorProductUniform3x1d({self.descriptor} (output last operand))"
 
@@ -678,6 +689,7 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
 
 
 class TensorProductUniform4x1d(TensorProductUniform1d):
+    @torch.jit.ignore
     def __repr__(self):
         return f"TensorProductUniform4x1d({self.descriptor} (output last operand))"
 
