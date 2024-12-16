@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional
+from typing import List, Optional
 
 import torch
 import torch.fx
@@ -177,6 +177,7 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
                 optimize_fallback=optimize_fallback,
             )
 
+    @torch.jit.ignore
     def __repr__(self):
         has_cuda_kernel = (
             "(with CUDA kernel)"
@@ -361,5 +362,7 @@ class FallbackImpl(torch.nn.Module):
     def forward(
         self, x0: torch.Tensor, i0: torch.Tensor, x1: torch.Tensor
     ) -> torch.Tensor:
-        fs: List[torch.Tensor] = [f([x0[i0]] + [x1] * (f.num_operands - 2)) for f in self.fs]
+        fs: List[torch.Tensor] = [
+            f([x0[i0]] + [x1] * (f.num_operands - 2)) for f in self.fs
+        ]
         return torch.sum(torch.stack(fs), dim=0)

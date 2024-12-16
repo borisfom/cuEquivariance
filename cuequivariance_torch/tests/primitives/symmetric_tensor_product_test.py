@@ -74,7 +74,7 @@ def test_primitive_indexed_symmetric_tensor_product_cuda_vs_fx(
     m = cuet.IWeightedSymmetricTensorProduct(
         ds, math_dtype=math_dtype, device=device, use_fallback=use_fallback
     )
-    
+
     m = torch.jit.script(m)
 
     x0 = torch.randn((2, m.x0_size), device=device, dtype=dtype, requires_grad=True)

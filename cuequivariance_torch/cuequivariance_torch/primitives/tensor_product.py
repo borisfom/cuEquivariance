@@ -24,6 +24,7 @@ from cuequivariance import segmented_tensor_product as stp
 
 logger = logging.getLogger(__name__)
 
+
 @torch.jit.script
 def prod(numbers: List[int]):
     product = 1
@@ -138,6 +139,7 @@ class TensorProduct(torch.nn.Module):
             )
             self._optimize_fallback = optimize_fallback
 
+    @torch.jit.ignore
     def __repr__(self):
         has_cuda_kernel = (
             "(with CUDA kernel)" if self.has_cuda else "(without CUDA kernel)"
@@ -211,28 +213,22 @@ def _tensor_product_fx(
                 seg_shape = descriptor.get_segment_shape(oid, path)
                 inp = inputs[oid][..., slices[oid][path.indices[oid]]]
                 if len(seg_shape) > 0:
-                    inp = inp.reshape(
-                        inputs[oid].shape[:-1] + seg_shape
-                    )
+                    inp = inp.reshape(inputs[oid].shape[:-1] + seg_shape)
                 else:
-                    inp = inp.reshape(
-                        inputs[oid].shape[:-1]
-                    )
+                    inp = inp.reshape(inputs[oid].shape[:-1])
 
-                segments.append(
-                    inp.to(dtype=math_dtype)
-                )
+                segments.append(inp.to(dtype=math_dtype))
 
-            int_dtype = {
-                2: torch.int16,
-                4: torch.int32,
-                8: torch.int64,
-            }[math_dtype.itemsize]
+            # int_dtype = {
+            #    2: torch.int16,
+            #    4: torch.int32,
+            #    8: torch.int64,
+            # }[math_dtype.itemsize]
 
             constants[f"c{path_idx}"] = torch.tensor(
                 path.coefficients, dtype=math_dtype, device=device
-            ) # .view(dtype=int_dtype)
-            
+            )  # .view(dtype=int_dtype)
+
             c = (
                 torch.fx.Proxy(graph.get_attr(f"c{path_idx}"), tracer=tracer)
                 # .view(dtype=math_dtype)
@@ -245,10 +241,10 @@ def _tensor_product_fx(
             outputs += [
                 out.reshape(out.shape[: out.ndim - len(seg_shape)] + (prod(seg_shape),))
             ]
- 
+
         if len(outputs) == 0:
             raise NotImplementedError("No FX implementation for empty paths")
-        
+
         def _sum(tensors, *, shape=None, like=None):
             if len(tensors) == 0:
                 return like.new_zeros(shape)

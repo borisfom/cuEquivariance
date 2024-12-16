@@ -91,13 +91,13 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
         (torch.bfloat16, torch.float32, 1.0),
     ]
 
-export_modes = ["script", "eager"] # , "export", "onnx", "trt", "torch_trt", "jit"]
+export_modes = ["script", "eager"]  # , "export", "onnx", "trt", "torch_trt", "jit"]
+
 
 @pytest.mark.parametrize("d", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, tol", settings)
 @pytest.mark.parametrize("use_fallback", [True, False])
 @pytest.mark.parametrize("mode", export_modes)
-
 def test_primitive_tensor_product_cuda_vs_fx(
     d: stp.SegmentedTensorProduct,
     dtype: torch.dtype,
@@ -105,12 +105,14 @@ def test_primitive_tensor_product_cuda_vs_fx(
     tol: float,
     use_fallback: bool,
     mode: str,
-    tmp_path: str
+    tmp_path: str,
 ):
     if use_fallback is False and not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
-    if use_fallback is True and not mode in ["eager", "script", "export"]:
-        pytest.skip("Only eager, script and export modes are supported for the fallback!")
+    if use_fallback is True and mode not in ["eager", "script", "export"]:
+        pytest.skip(
+            "Only eager, script and export modes are supported for the fallback!"
+        )
 
     for batches in itertools.product([(16,), (), (4, 1)], repeat=d.num_operands - 1):
         inputs = [
@@ -124,12 +126,14 @@ def test_primitive_tensor_product_cuda_vs_fx(
         ]
 
         m = cuet.TensorProduct(
-            d, device=device, math_dtype=math_dtype, 
+            d,
+            device=device,
+            math_dtype=math_dtype,
             use_fallback=use_fallback,
             optimize_fallback=True,
         )
         m = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
-        
+
         out1 = m(inputs)
 
         m = cuet.TensorProduct(
