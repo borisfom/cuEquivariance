@@ -168,7 +168,7 @@ class NoConvTensor(torch.Tensor):
         result = super().to(*new_args, **new_kwargs)
         return result
     def clone(self):
-        return super().clone()
+        return torch.Tensor(self)
 
 def _tensor_product_fx(
     descriptor: stp.SegmentedTensorProduct,
