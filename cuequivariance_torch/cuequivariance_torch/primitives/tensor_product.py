@@ -227,19 +227,19 @@ def _tensor_product_fx(
 
                 segments.append(inp.to(dtype=math_dtype))
 
-            # int_dtype = {
-            #    2: torch.int16,
-            #    4: torch.int32,
-            #    8: torch.int64,
-            # }[math_dtype.itemsize]
+            int_dtype = {
+                2: torch.int16,
+                4: torch.int32,
+                8: torch.int64,
+            }[math_dtype.itemsize]
 
             constants[f"c{path_idx}"] = torch.tensor(
                 path.coefficients, dtype=math_dtype, device=device
-            )  # .view(dtype=int_dtype)
+            ).view(dtype=int_dtype)
 
             c = (
                 torch.fx.Proxy(graph.get_attr(f"c{path_idx}"), tracer=tracer)
-                # .view(dtype=math_dtype)
+                .view(dtype=math_dtype)
                 .clone()
             )
             out = torch.einsum(formula, c, *segments)
