@@ -130,7 +130,6 @@ def test_primitive_tensor_product_cuda_vs_fx(
             device=device,
             math_dtype=math_dtype,
             use_fallback=use_fallback,
-            optimize_fallback=True,
         )
         m = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
 
@@ -141,7 +140,6 @@ def test_primitive_tensor_product_cuda_vs_fx(
             device=device,
             math_dtype=torch.float64,
             use_fallback=True,
-            optimize_fallback=False,
         )
 
         inputs_ = [inp.to(torch.float64) for inp in inputs]

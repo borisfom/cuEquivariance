@@ -91,7 +91,6 @@ def test_performance_cuda_vs_fx(
         device=device,
         math_dtype=math_dtype,
         use_fallback=True,
-        optimize_fallback=True,
     )
 
     inputs = [
@@ -159,7 +158,6 @@ def test_precision_cuda_vs_fx(
         device=device,
         math_dtype=torch.float64,
         use_fallback=True,
-        optimize_fallback=True,
     )
     inputs = [x.to(torch.float64) for x in inputs]
     y1 = m(inputs).to(dtype)

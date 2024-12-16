@@ -91,7 +91,6 @@ class TensorProduct(torch.nn.Module):
         device (torch.device, optional): The device on which the calculations are performed.
         use_fallback (bool, optional):  Determines the computation method. If `None` (default), a CUDA kernel will be used if available. If `False`, a CUDA kernel will be used, and an exception is raised if it's not available. If `True`, a PyTorch fallback method is used regardless of CUDA kernel availability.
 
-        optimize_fallback (bool, optional): If `True`, the fallback method is optimized. If `False`, the fallback method is used without optimization.
         Raises:
             RuntimeError: If `use_fallback` is `False` and no CUDA kernel is available.
 
@@ -104,7 +103,6 @@ class TensorProduct(torch.nn.Module):
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
         use_fallback: Optional[bool] = None,
-        optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
         self.descriptor = descriptor
@@ -135,17 +133,7 @@ class TensorProduct(torch.nn.Module):
             )
 
         if self.f is None:
-            if optimize_fallback is None:
-                optimize_fallback = False
-                warnings.warn(
-                    "The fallback method is used but it has not been optimized. "
-                    "Consider setting optimize_fallback=True when creating the TensorProduct module."
-                )
-
-            self.f = _tensor_product_fx(
-                descriptor, device, math_dtype, optimize_fallback
-            )
-            self._optimize_fallback = optimize_fallback
+            self.f = _tensor_product_fx(descriptor, device, math_dtype, True)
 
     @torch.jit.ignore
     def __repr__(self):
@@ -170,9 +158,6 @@ class TensorProduct(torch.nn.Module):
                 `last_operand_size` is the size of the last operand in the descriptor.
 
         """
-        # if any(x.numel() == 0 for x in inputs):
-        #    use_fallback = True  # Empty tensors are not supported by the CUDA kernel
-
         return self.f(inputs)
 
 class NoConvTensor(torch.Tensor):

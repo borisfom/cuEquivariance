@@ -36,7 +36,6 @@ class FullyConnectedTensorProduct(torch.nn.Module):
         use_fallback (bool, optional): If `None` (default), a CUDA kernel will be used if available.
                 If `False`, a CUDA kernel will be used, and an exception is raised if it's not available.
                 If `True`, a PyTorch fallback method is used regardless of CUDA kernel availability.
-        optimize_fallback (bool, optional): Whether to optimize fallback. Defaults to None.
 
     Note:
         In e3nn there was a irrep_normalization and path_normalization parameters.
@@ -59,7 +58,6 @@ class FullyConnectedTensorProduct(torch.nn.Module):
         dtype: Optional[torch.dtype] = None,
         math_dtype: Optional[torch.dtype] = None,
         use_fallback: Optional[bool] = None,
-        optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
         irreps_in1, irreps_in2, irreps_out = default_irreps(
@@ -101,7 +99,7 @@ class FullyConnectedTensorProduct(torch.nn.Module):
             layout_out=layout_out,
             device=device,
             math_dtype=math_dtype,
-            optimize_fallback=optimize_fallback,
+            use_fallback=use_fallback,
         )
 
     def extra_repr(self) -> str:
