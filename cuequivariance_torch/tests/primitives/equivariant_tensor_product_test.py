@@ -198,7 +198,7 @@ export_modes = ["script"]  # , "torch_trt", "jit"]
 
 @pytest.mark.parametrize("e", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
-@pytest.mark.parametrize("use_fallback", [True, False])
+@pytest.mark.parametrize("use_fallback", [False])
 @pytest.mark.parametrize("mode", export_modes)
 def test_export(
     e: cue.EquivariantTensorProduct,

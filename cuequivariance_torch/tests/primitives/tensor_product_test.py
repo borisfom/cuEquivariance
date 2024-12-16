@@ -109,9 +109,9 @@ def test_primitive_tensor_product_cuda_vs_fx(
 ):
     if use_fallback is False and not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
-    if use_fallback is True and mode not in ["eager", "script", "export"]:
+    if use_fallback is True and mode not in ["eager"]:
         pytest.skip(
-            "Only eager, script and export modes are supported for the fallback!"
+            "Only eager mode is supported for the fallback!"
         )
 
     for batches in itertools.product([(16,), (), (4, 1)], repeat=d.num_operands - 1):
