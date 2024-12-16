@@ -121,10 +121,12 @@ class Linear(torch.nn.Module):
                 raise ValueError("Internal weights are used, weight should be None")
 
             weight = self.weight
-
-        if self.shared_weights and weight.ndim != 1:
-            raise ValueError("Shared weights should be 1D tensor")
-        if not self.shared_weights and weight.ndim != 2:
-            raise ValueError("Weights should be 2D tensor")
-
+            
+        if weight is not None:
+            if self.shared_weights and weight.ndim != 1:
+                raise ValueError("Shared weights should be 1D tensor")
+            if not self.shared_weights and weight.ndim != 2:
+                raise ValueError("Weights should be 2D tensor")
+        else:
+            raise ValueError("Weights should not be None")
         return self.f([weight, x])

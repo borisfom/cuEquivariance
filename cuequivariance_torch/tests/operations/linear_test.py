@@ -64,7 +64,7 @@ def test_linear_fwd(
         use_fallback=True,
     )
     x = torch.randn(10, irreps_in.dim, dtype=torch.float64).cuda()
-
+        
     if shared_weights:
         y = linear(x)
         y_fx = linear_fx(x)

@@ -361,6 +361,5 @@ class FallbackImpl(torch.nn.Module):
     def forward(
         self, x0: torch.Tensor, i0: torch.Tensor, x1: torch.Tensor
     ) -> torch.Tensor:
-        return sum(
-            f([x0[i0]] + [x1] * (f.descriptor.num_operands - 2)) for f in self.fs
-        )
+        fs: List[torch.Tensor] = [f([x0[i0]] + [x1] * (f.num_operands - 2)) for f in self.fs]
+        return torch.sum(torch.stack(fs), dim=0)

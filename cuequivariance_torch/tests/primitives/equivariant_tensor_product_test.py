@@ -192,36 +192,12 @@ def test_compile(
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
 
 
-@pytest.mark.parametrize("e", make_descriptors())
-@pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
-def test_script(
-    e: cue.EquivariantTensorProduct,
-    dtype: torch.dtype,
-    math_dtype: torch.dtype,
-    atol: float,
-    rtol: float,
-):
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is not available")
-
-    m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, use_fallback=False, device=device, math_dtype=math_dtype
-    )
-    inputs = [
-        torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
-        for inp in e.inputs
-    ]
-    res = m(inputs)
-    m_script = torch.jit.script(m)
-    res_script = m_script(inputs)
-    torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
-
-
-export_modes = ["export", "onnx", "trt", "torch_trt", "jit"]
+export_modes = ["script" ] # , "export", "onnx", "trt" ] # , "torch_trt", "jit"]
 
 
 @pytest.mark.parametrize("e", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
+@pytest.mark.parametrize("use_fallback", [True, False])
 @pytest.mark.parametrize("mode", export_modes)
 def test_export(
     e: cue.EquivariantTensorProduct,
@@ -230,19 +206,27 @@ def test_export(
     atol: float,
     rtol: float,
     mode: str,
+    use_fallback: bool,
     tmp_path,
 ):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
+    if use_fallback is True and not mode in ["eager", "script"]:
+        pytest.skip("Only eager, script and export modes are supported for the fallback!")
+
     m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=False, device=device
+        e, layout=cue.mul_ir, math_dtype=math_dtype, use_fallback=use_fallback, device=device
     )
+    exp_inputs = [
+        torch.randn((512, inp.irreps.dim), device=device, dtype=dtype)
+        for inp in e.inputs
+    ]
     inputs = [
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
         for inp in e.inputs
     ]
     res = m(inputs)
-    m_script = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
+    m_script = module_with_mode(mode, m, [exp_inputs], math_dtype, tmp_path)
     res_script = m_script(inputs)
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)

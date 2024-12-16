@@ -24,7 +24,7 @@ from cuequivariance import segmented_tensor_product as stp
 
 logger = logging.getLogger(__name__)
 
-
+@torch.jit.script
 def prod(numbers: List[int]):
     product = 1
     for num in numbers:
@@ -206,26 +206,36 @@ def _tensor_product_fx(
 
         outputs = []
         for path_idx, path in enumerate(descriptor.paths):
-            segments = [
-                inputs[oid][..., slices[oid][path.indices[oid]]]
-                .reshape(
-                    inputs[oid].shape[:-1] + descriptor.get_segment_shape(oid, path)
+            segments = []
+            for oid in range(num_inputs):
+                seg_shape = descriptor.get_segment_shape(oid, path)
+                inp = inputs[oid][..., slices[oid][path.indices[oid]]]
+                if len(seg_shape) > 0:
+                    inp = inp.reshape(
+                        inputs[oid].shape[:-1] + seg_shape
+                    )
+                else:
+                    inp = inp.reshape(
+                        inputs[oid].shape[:-1]
+                    )
+
+                segments.append(
+                    inp.to(dtype=math_dtype)
                 )
-                .to(dtype=math_dtype)
-                for oid in range(num_inputs)
-            ]
+
+            int_dtype = {
+                2: torch.int16,
+                4: torch.int32,
+                8: torch.int64,
+            }[math_dtype.itemsize]
+
             constants[f"c{path_idx}"] = torch.tensor(
                 path.coefficients, dtype=math_dtype, device=device
-            ).view(
-                {
-                    2: torch.int16,
-                    4: torch.int32,
-                    8: torch.int64,
-                }[math_dtype.itemsize]
-            )
+            ) # .view(dtype=int_dtype)
+            
             c = (
                 torch.fx.Proxy(graph.get_attr(f"c{path_idx}"), tracer=tracer)
-                .view(math_dtype)
+                # .view(dtype=math_dtype)
                 .clone()
             )
             out = torch.einsum(formula, c, *segments)
@@ -235,9 +245,17 @@ def _tensor_product_fx(
             outputs += [
                 out.reshape(out.shape[: out.ndim - len(seg_shape)] + (prod(seg_shape),))
             ]
-
+ 
         if len(outputs) == 0:
             raise NotImplementedError("No FX implementation for empty paths")
+        
+        def _sum(tensors, *, shape=None, like=None):
+            if len(tensors) == 0:
+                return like.new_zeros(shape)
+            out = tensors[0]
+            for t in tensors[1:]:
+                out = torch.add(out, t)
+            return out
 
         batch_shape = outputs[0].shape[:-1]
         output = torch.cat(
@@ -407,15 +425,6 @@ class _Wrapper(torch.nn.Module):
         return out.reshape(shape + (out.shape[-1],))
 
 
-def _sum(tensors, *, shape=None, like=None):
-    if len(tensors) == 0:
-        return like.new_zeros(shape)
-    out = tensors[0]
-    for t in tensors[1:]:
-        out += t
-    return out
-
-
 def _tensor_product_cuda(
     descriptor: stp.SegmentedTensorProduct,
     device: Optional[torch.device],
@@ -494,6 +503,7 @@ def _tensor_product_cuda(
         return FusedTensorProductOp4(descriptor, perm[:3], device, math_dtype)
 
 
+@torch.jit.script
 def _reshape(x: torch.Tensor, leading_shape: List[int]) -> torch.Tensor:
     # Make x have shape (Z, x.shape[-1]) or (x.shape[-1],)
     if prod(leading_shape) > 1 and prod(x.shape[:-1]) == 1:
