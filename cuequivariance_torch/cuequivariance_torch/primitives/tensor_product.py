@@ -175,6 +175,15 @@ class TensorProduct(torch.nn.Module):
 
         return self.f(inputs)
 
+class NoConvTensor(torch.Tensor):
+    def to(self, *args, **kwargs):
+        new_kwargs = kwargs.copy()
+        new_kwargs.pop('dtype', None)
+        new_args = [None if isinstance(a, torch.dtype) else a for a in args ]
+        result = super().to(*new_args, **new_kwargs)
+        return result
+    def clone(self):
+        return super().clone()
 
 def _tensor_product_fx(
     descriptor: stp.SegmentedTensorProduct,
@@ -227,21 +236,17 @@ def _tensor_product_fx(
 
                 segments.append(inp.to(dtype=math_dtype))
 
-            # int_dtype = {
-            #    2: torch.int16,
-            #    4: torch.int32,
-            #    8: torch.int64,
-            # }[math_dtype.itemsize]
-
-            constants[f"c{path_idx}"] = torch.tensor(
+            c_tensor = NoConvTensor(torch.tensor(
                 path.coefficients, dtype=math_dtype, device=device
-            )  # .view(dtype=int_dtype)
+            ))
+
+            constants[f"c{path_idx}"] = c_tensor
 
             c = (
                 torch.fx.Proxy(graph.get_attr(f"c{path_idx}"), tracer=tracer)
-                # .view(dtype=math_dtype)
                 .clone()
             )
+            # out = torch.tensor(c)
             out = torch.einsum(formula, c, *segments)
             out = out.to(dtype=inputs[0].dtype)
 
@@ -718,7 +723,7 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
 
         out = self._f(x0, x1, x2)
 
-        return out.reshape(shape + (out.shape[-1],))
+        return out # .reshape(shape + (out.shape[-1],))
 
 
 def _permutation_module(permutation: Tuple[int, ...]):

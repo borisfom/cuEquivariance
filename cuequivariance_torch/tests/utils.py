@@ -135,9 +135,9 @@ def module_with_mode(
             module = torch.fx.symbolic_trace(module)
         elif mode == "script":
             module = torch.jit.script(module)
-            # fname = os.path.join(tmp_path, "test.ts")
-            # torch.jit.save(module, fname)
-            # module = torch.jit.load(fname)
+            fname = os.path.join(tmp_path, "test.ts")
+            torch.jit.save(module, fname)
+            module = torch.jit.load(fname)
         elif mode == "jit":
             module = torch.jit.trace(module, inputs)
             fname = os.path.join(tmp_path, "test.ts")
