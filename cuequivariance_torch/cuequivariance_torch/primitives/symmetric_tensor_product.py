@@ -32,7 +32,6 @@ class SymmetricTensorProduct(torch.nn.Module):
     Args:
         descriptors (list of SegmentedTensorProduct): The list of SegmentedTensorProduct descriptors.
         math_dtype (torch.dtype, optional): The data type of the coefficients and calculations.
-        optimize_fallback (bool, optional): If `True`, the torch.fx graph will be optimized before execution. Because the optimization takes time, it is turned off by default.
     """
 
     def __init__(
@@ -42,7 +41,6 @@ class SymmetricTensorProduct(torch.nn.Module):
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
         use_fallback: Optional[bool] = None,
-        optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
 
@@ -57,7 +55,6 @@ class SymmetricTensorProduct(torch.nn.Module):
                 device=device,
                 math_dtype=math_dtype,
                 use_fallback=use_fallback,
-                optimize_fallback=optimize_fallback,
             )
         else:
             self.f0 = None
@@ -85,7 +82,6 @@ class SymmetricTensorProduct(torch.nn.Module):
             device=device,
             math_dtype=math_dtype,
             use_fallback=use_fallback,
-            optimize_fallback=optimize_fallback,
         )
 
     def forward(self, x0: torch.Tensor) -> torch.Tensor:
@@ -123,9 +119,6 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
         The list of SegmentedTensorProduct descriptors
     math_dtype : torch.dtype, optional
         The data type of the coefficients and calculations
-    optimize_fallback : bool, optional
-        If `True`, the torch.fx graph will be optimized before execution
-        Because the optimization takes time, it is turned off by default.
     """
 
     def __init__(
@@ -135,7 +128,6 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
         use_fallback: Optional[bool] = None,
-        optimize_fallback: Optional[bool] = None,
     ):
         super().__init__()
 
@@ -174,7 +166,6 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
                 descriptors,
                 device,
                 math_dtype=math_dtype,
-                optimize_fallback=optimize_fallback,
             )
 
     @torch.jit.ignore
@@ -344,7 +335,6 @@ class FallbackImpl(torch.nn.Module):
         stps: list[stp.SegmentedTensorProduct],
         device: Optional[torch.device],
         math_dtype: Optional[torch.dtype],
-        optimize_fallback: Optional[bool],
     ):
         super().__init__()
         self.fs = torch.nn.ModuleList(
@@ -354,7 +344,6 @@ class FallbackImpl(torch.nn.Module):
                     device=device,
                     math_dtype=math_dtype,
                     use_fallback=True,
-                    optimize_fallback=optimize_fallback,
                 )
                 for d in stps
             ]

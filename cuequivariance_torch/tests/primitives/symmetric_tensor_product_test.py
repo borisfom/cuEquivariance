@@ -91,7 +91,6 @@ def test_primitive_indexed_symmetric_tensor_product_cuda_vs_fx(
         math_dtype=torch.float64,
         device=device,
         use_fallback=True,
-        optimize_fallback=True,
     )
     out2 = m(x0_, i0, x1_)
 
