@@ -486,14 +486,8 @@ class FusedTensorProductOp3(torch.nn.Module):
                 f"Calling FusedTensorProductOp3: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
 
-        if x0.ndim == 1:
-            x0 = x0.unsqueeze(0)
-        if x1.ndim == 1:
-            x1 = x1.unsqueeze(0)
-        Z = max(x0.shape[0], x1.shape[0])
-        x0 = x0.expand(Z, -1)
-        x1 = x1.expand(Z, -1)
-
+        # ops.FusedTensorProductOp3 expects inputs
+        # of shape (Z, dim) or (dim,)
         return self._f(x0, x1)
 
 
@@ -542,18 +536,8 @@ class FusedTensorProductOp4(torch.nn.Module):
                 f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
 
-        if x0.ndim == 1:
-            x0 = x0.unsqueeze(0)
-        if x1.ndim == 1:
-            x1 = x1.unsqueeze(0)
-        if x2.ndim == 1:
-            x2 = x2.unsqueeze(0)
-
-        Z = max(x0.shape[0], x1.shape[0], x2.shape[0])
-        x0 = x0.expand(Z, -1)
-        x1 = x1.expand(Z, -1)
-        x2 = x2.expand(Z, -1)
-
+        # ops.FusedTensorProductOp4 expects inputs
+        # of shape (Z, dim) or (dim,)
         return self._f(x0, x1, x2)
 
 
@@ -602,6 +586,8 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
         if x1.ndim == 1:
             x1 = x1.unsqueeze(0)
 
+        # ops.TensorProductUniform1d expects inputs
+        # of shape (Z, dim) or (1, dim)
         return self._f(x0, x1, x0)
 
 
@@ -625,6 +611,8 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
         if x2.ndim == 1:
             x2 = x2.unsqueeze(0)
 
+        # ops.TensorProductUniform1d expects inputs
+        # of shape (Z, dim) or (1, dim)
         return self._f(x0, x1, x2)
 
 
