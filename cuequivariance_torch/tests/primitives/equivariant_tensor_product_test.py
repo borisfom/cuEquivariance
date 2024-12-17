@@ -190,9 +190,7 @@ def test_compile(
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
 
 
-# export_modes = ["script", "export", "onnx", "trt" ] # , "torch_trt", "jit"]
-export_modes = ["script"]  # , "torch_trt", "jit"]
-
+export_modes = ["script", "export", "onnx", "trt", "torch_trt", "jit"]
 
 @pytest.mark.parametrize("e", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
@@ -210,11 +208,6 @@ def test_export(
 ):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
-
-    if use_fallback is True and mode not in ["eager", "script"]:
-        pytest.skip(
-            "Only eager, script and export modes are supported for the fallback!"
-        )
 
     m = cuet.EquivariantTensorProduct(
         e,

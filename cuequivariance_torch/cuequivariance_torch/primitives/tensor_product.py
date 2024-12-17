@@ -117,14 +117,20 @@ class TensorProduct(torch.nn.Module):
         """
         return self.f(inputs)
 
-def disable_type_conv(t: torch.Tensor):
-    original_to = t.to
-    def to_notypeconv(self, *args, **kwargs):
-        new_kwargs = kwargs.copy()
-        new_kwargs.pop('dtype', None)
-        new_args = [None if isinstance(a, torch.dtype) else a for a in args ]
-        result = original_to(self, *new_args, **new_kwargs)
-        return result
+def to_notypeconv(self, *args, **kwargs):
+    new_kwargs = kwargs.copy()
+    new_kwargs.pop('dtype', None)
+    new_args = [None if isinstance(a, torch.dtype) else a for a in args ]
+    result = self.__original_to(*new_args, **new_kwargs)
+    return result
+
+
+def disable_type_conv(t):
+    """
+    This modifier can be used on Tensors or whole Modules
+    to prevent them from being modified during to(dtype=x) calls 
+    """
+    t.__original_to = t.to
     t.to = to_notypeconv
     return t
 
