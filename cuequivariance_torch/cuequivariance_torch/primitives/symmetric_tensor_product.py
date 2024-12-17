@@ -20,7 +20,6 @@ import torch.fx
 
 import cuequivariance.segmented_tensor_product as stp
 import cuequivariance_torch as cuet
-from cuequivariance_torch.primitives.tensor_product import broadcast_shapes, prod
 
 logger = logging.getLogger(__name__)
 
@@ -192,9 +191,9 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
         x0 : torch.Tensor
             The input tensor for the first operand. It should have the shape (i0.max() + 1, x0_size).
         i0 : torch.Tensor
-            The index tensor for the first operand. It should have the shape (...).
+            The index tensor for the first operand. It should have the shape (batch).
         x1 : torch.Tensor
-            The repeated input tensor. It should have the shape (..., x1_size).
+            The repeated input tensor. It should have the shape (batch, x1_size).
 
         Returns
         -------
@@ -207,14 +206,15 @@ class IWeightedSymmetricTensorProduct(torch.nn.Module):
             x0.ndim == 2,
             f"Expected 2 dims (i0.max() + 1, x0_size), got shape {x0.shape}",
         )
-        shape = broadcast_shapes([i0.shape, x1.shape[:-1]])
-        i0 = i0.expand(shape)
-        i0 = i0.reshape((prod(shape),))
-        x1 = x1.expand(shape + (x1.shape[-1],)).reshape((prod(shape), x1.shape[-1]))
-
-        out = self.f(x0, i0, x1)
-        out = out.reshape(shape + (self.x2_size,))
-        return out
+        torch._assert(
+            i0.ndim == 1,
+            f"Expected 1 dim (batch), got shape {i0.shape}",
+        )
+        torch._assert(
+            x1.ndim == 2,
+            f"Expected 2 dims (batch, x1_size), got shape {x1.shape}",
+        )
+        return self.f(x0, i0, x1)
 
 
 def _check_descriptors(descriptors: list[stp.SegmentedTensorProduct]):
