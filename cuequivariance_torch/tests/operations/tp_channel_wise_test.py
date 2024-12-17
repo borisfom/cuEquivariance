@@ -34,7 +34,7 @@ list_of_irreps = [
 @pytest.mark.parametrize("layout", [cue.ir_mul, cue.mul_ir])
 @pytest.mark.parametrize("use_fallback", [False, True])
 @pytest.mark.parametrize("batch", [1, 32])
-def test_channel_wise(
+def test_channel_wise_fwd(
     irreps1: cue.Irreps,
     irreps2: cue.Irreps,
     irreps3: cue.Irreps,
@@ -72,13 +72,14 @@ def test_channel_wise(
     torch.testing.assert_close(out1, out2, atol=1e-5, rtol=1e-5)
 
 
-def test_channel_wise_bwd_bwd():
+@pytest.mark.parametrize("irreps", ["32x0", "2x0 + 3x1"])
+def test_channel_wise_bwd_bwd(irreps: cue.Irreps):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
-    irreps1 = cue.Irreps("SO3", "2x0 + 3x1")
+    irreps1 = cue.Irreps("SO3", irreps)
     irreps2 = cue.Irreps("SO3", "0 + 1")
-    irreps3 = cue.Irreps("SO3", "0 + 1")
+    irreps3 = cue.Irreps("SO3", irreps)
 
     x1 = torch.randn(
         32, irreps1.dim, device=device, requires_grad=True, dtype=torch.float64

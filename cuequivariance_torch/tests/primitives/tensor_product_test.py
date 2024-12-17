@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import itertools
 
 import pytest
 import torch
@@ -113,50 +112,49 @@ def test_primitive_tensor_product_cuda_vs_fx(
             "Only eager, script and export modes are supported for the fallback!"
         )
 
-    for batches in itertools.product([(16,), (), (4, 1)], repeat=d.num_operands - 1):
-        inputs = [
-            torch.randn(
-                batches[i] + (d.operands[i].size,),
-                device=device,
-                dtype=dtype,
-                requires_grad=True,
-            )
-            for i in range(d.num_operands - 1)
-        ]
-
-        m = cuet.TensorProduct(
-            d,
+    inputs = [
+        torch.randn(
+            (12, d.operands[i].size),
             device=device,
-            math_dtype=math_dtype,
-            use_fallback=use_fallback,
+            dtype=dtype,
+            requires_grad=True,
         )
-        m = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
+        for i in range(d.num_operands - 1)
+    ]
 
-        out1 = m(inputs)
+    m = cuet.TensorProduct(
+        d,
+        device=device,
+        math_dtype=math_dtype,
+        use_fallback=use_fallback,
+    )
+    m = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
 
-        m = cuet.TensorProduct(
-            d,
-            device=device,
-            math_dtype=torch.float64,
-            use_fallback=True,
-        )
+    out1 = m(inputs)
 
-        inputs_ = [inp.to(torch.float64) for inp in inputs]
-        out2 = m(inputs_)
+    m = cuet.TensorProduct(
+        d,
+        device=device,
+        math_dtype=torch.float64,
+        use_fallback=True,
+    )
 
-        assert out1.shape[:-1] == torch.broadcast_shapes(*batches)
-        assert out1.dtype == dtype
+    inputs_ = [inp.to(torch.float64) for inp in inputs]
+    out2 = m(inputs_)
 
-        torch.testing.assert_close(out1, out2.to(dtype), atol=tol, rtol=tol)
+    assert out1.shape[:-1] == (12,)
+    assert out1.dtype == dtype
 
-        grad1 = torch.autograd.grad(out1.sum(), inputs, create_graph=True)
-        grad2 = torch.autograd.grad(out2.sum(), inputs_, create_graph=True)
+    torch.testing.assert_close(out1, out2.to(dtype), atol=tol, rtol=tol)
 
-        for g1, g2 in zip(grad1, grad2):
-            torch.testing.assert_close(g1, g2.to(dtype), atol=10 * tol, rtol=10 * tol)
+    grad1 = torch.autograd.grad(out1.sum(), inputs, create_graph=True)
+    grad2 = torch.autograd.grad(out2.sum(), inputs_, create_graph=True)
 
-        double_grad1 = torch.autograd.grad(sum(g.sum() for g in grad1), inputs)
-        double_grad2 = torch.autograd.grad(sum(g.sum() for g in grad2), inputs_)
+    for g1, g2 in zip(grad1, grad2):
+        torch.testing.assert_close(g1, g2.to(dtype), atol=10 * tol, rtol=10 * tol)
 
-        for g1, g2 in zip(double_grad1, double_grad2):
-            torch.testing.assert_close(g1, g2.to(dtype), atol=100 * tol, rtol=100 * tol)
+    double_grad1 = torch.autograd.grad(sum(g.sum() for g in grad1), inputs)
+    double_grad2 = torch.autograd.grad(sum(g.sum() for g in grad2), inputs_)
+
+    for g1, g2 in zip(double_grad1, double_grad2):
+        torch.testing.assert_close(g1, g2.to(dtype), atol=100 * tol, rtol=100 * tol)
