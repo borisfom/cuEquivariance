@@ -117,16 +117,20 @@ class TensorProduct(torch.nn.Module):
         """
         return self.f(inputs)
 
+
 def disable_type_conv(t: torch.Tensor):
     original_to = t.to
+
     def to_notypeconv(self, *args, **kwargs):
         new_kwargs = kwargs.copy()
-        new_kwargs.pop('dtype', None)
-        new_args = [None if isinstance(a, torch.dtype) else a for a in args ]
+        new_kwargs.pop("dtype", None)
+        new_args = [None if isinstance(a, torch.dtype) else a for a in args]
         result = original_to(self, *new_args, **new_kwargs)
         return result
+
     t.to = to_notypeconv
     return t
+
 
 def _tensor_product_fx(
     descriptor: stp.SegmentedTensorProduct,
@@ -179,9 +183,9 @@ def _tensor_product_fx(
 
                 segments.append(inp.to(dtype=math_dtype))
 
-            c_tensor = disable_type_conv(torch.tensor(
-                path.coefficients, dtype=math_dtype, device=device
-            ))
+            c_tensor = disable_type_conv(
+                torch.tensor(path.coefficients, dtype=math_dtype, device=device)
+            )
             constants[f"c{path_idx}"] = c_tensor
 
             c = torch.fx.Proxy(graph.get_attr(f"c{path_idx}"), tracer=tracer).clone()
@@ -355,6 +359,7 @@ class _Wrapper(torch.nn.Module):
                     "input shape[-1] does not match operand size",
                 )
 
+        args = [arg.unsqueeze(0) if arg.ndim == 1 else arg for arg in args]
         return self.module(args)
 
 
@@ -481,6 +486,14 @@ class FusedTensorProductOp3(torch.nn.Module):
                 f"Calling FusedTensorProductOp3: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
 
+        if x0.ndim == 1:
+            x0 = x0.unsqueeze(0)
+        if x1.ndim == 1:
+            x1 = x1.unsqueeze(0)
+        Z = max(x0.shape[0], x1.shape[0])
+        x0 = x0.expand(Z, -1)
+        x1 = x1.expand(Z, -1)
+
         return self._f(x0, x1)
 
 
@@ -529,6 +542,18 @@ class FusedTensorProductOp4(torch.nn.Module):
                 f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
 
+        if x0.ndim == 1:
+            x0 = x0.unsqueeze(0)
+        if x1.ndim == 1:
+            x1 = x1.unsqueeze(0)
+        if x2.ndim == 1:
+            x2 = x2.unsqueeze(0)
+
+        Z = max(x0.shape[0], x1.shape[0], x2.shape[0])
+        x0 = x0.expand(Z, -1)
+        x1 = x1.expand(Z, -1)
+        x2 = x2.expand(Z, -1)
+
         return self._f(x0, x1, x2)
 
 
@@ -572,6 +597,11 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
                 f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
 
+        if x0.ndim == 1:
+            x0 = x0.unsqueeze(0)
+        if x1.ndim == 1:
+            x1 = x1.unsqueeze(0)
+
         return self._f(x0, x1, x0)
 
 
@@ -587,6 +617,13 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
             logger.debug(
                 f"Calling TensorProductUniform4x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
+
+        if x0.ndim == 1:
+            x0 = x0.unsqueeze(0)
+        if x1.ndim == 1:
+            x1 = x1.unsqueeze(0)
+        if x2.ndim == 1:
+            x2 = x2.unsqueeze(0)
 
         return self._f(x0, x1, x2)
 
