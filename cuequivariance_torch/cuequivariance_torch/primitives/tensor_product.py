@@ -170,6 +170,17 @@ class NoConvTensor(torch.Tensor):
     def clone(self):
         return torch.Tensor(self)
 
+def disable_type_conv(t: torch.Tensor):
+    original_to = t.to
+    def to_notypeconv(self, *args, **kwargs):
+        new_kwargs = kwargs.copy()
+        new_kwargs.pop('dtype', None)
+        new_args = [None if isinstance(a, torch.dtype) else a for a in args ]
+        result = original_to(self, *new_args, **new_kwargs)
+        return result
+    t.to = to_notypeconv
+    return t
+
 def _tensor_product_fx(
     descriptor: stp.SegmentedTensorProduct,
     device: Optional[torch.device],
@@ -221,7 +232,7 @@ def _tensor_product_fx(
 
                 segments.append(inp.to(dtype=math_dtype))
 
-            c_tensor = NoConvTensor(torch.tensor(
+            c_tensor = disable_type_conv(torch.tensor(
                 path.coefficients, dtype=math_dtype, device=device
             ))
 
@@ -708,7 +719,7 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
 
         out = self._f(x0, x1, x2)
 
-        return out # .reshape(shape + (out.shape[-1],))
+        return out.reshape(shape + (out.shape[-1],))
 
 
 def _permutation_module(permutation: Tuple[int, ...]):
