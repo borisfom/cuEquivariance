@@ -153,8 +153,8 @@ def _tensor_product_fx(
             torch.fx.Proxy(graph.placeholder(f"input_{i}"), tracer)
             for i in range(num_inputs)
         ]
-        # for input in inputs:
-        #     torch._assert(input.ndim == 2, "input should have ndim=2")
+        for input in inputs:
+            torch._assert(input.ndim == 2, "input should have ndim=2")
         operand_subscripts = [
             f"Z{operand.subscripts}" for operand in descriptor.operands
         ]
