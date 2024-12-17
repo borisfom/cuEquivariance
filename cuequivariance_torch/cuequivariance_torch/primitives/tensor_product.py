@@ -38,49 +38,6 @@ def prod(numbers: List[int]):
         return math.prod(numbers)
 
 
-def broadcast_shapes(shapes: List[List[int]]):
-    """
-    This method is a workaround for script() not recognizing torch.broadcast_shapes()
-    """
-    if torch.jit.is_scripting():
-        max_len = 0
-        for shape in shapes:
-            if isinstance(shape, int):
-                if max_len < 1:
-                    max_len = 1
-            elif isinstance(shape, (tuple, list)):
-                s = len(shape)
-                if max_len < s:
-                    max_len = s
-        result = [1] * max_len
-        for shape in shapes:
-            if isinstance(shape, int):
-                shape = (shape,)
-            if isinstance(shape, (tuple, list)):
-                for i in range(-1, -1 - len(shape), -1):
-                    if shape[i] < 0:
-                        raise RuntimeError(
-                            "Trying to create tensor with negative dimension ({}): ({})".format(
-                                shape[i], shape[i]
-                            )
-                        )
-                    if shape[i] == 1 or shape[i] == result[i]:
-                        continue
-                    if result[i] != 1:
-                        raise RuntimeError(
-                            "Shape mismatch: objects cannot be broadcast to a single shape"
-                        )
-                    result[i] = shape[i]
-            else:
-                raise RuntimeError(
-                    "Input shapes should be of type ints, a tuple of ints, or a list of ints, got ",
-                    shape,
-                )
-        return torch.Size(result)
-    else:
-        return torch.functional.broadcast_shapes(*shapes)
-
-
 class TensorProduct(torch.nn.Module):
     """
     PyTorch module that computes the last operand of the segmented tensor product defined by the descriptor.
@@ -160,15 +117,18 @@ class TensorProduct(torch.nn.Module):
         """
         return self.f(inputs)
 
+
 class NoConvTensor(torch.Tensor):
     def to(self, *args, **kwargs):
         new_kwargs = kwargs.copy()
-        new_kwargs.pop('dtype', None)
-        new_args = [None if isinstance(a, torch.dtype) else a for a in args ]
+        new_kwargs.pop("dtype", None)
+        new_args = [None if isinstance(a, torch.dtype) else a for a in args]
         result = super().to(*new_args, **new_kwargs)
         return result
+
     def clone(self):
         return torch.Tensor(self)
+
 
 def _tensor_product_fx(
     descriptor: stp.SegmentedTensorProduct,
@@ -221,16 +181,13 @@ def _tensor_product_fx(
 
                 segments.append(inp.to(dtype=math_dtype))
 
-            c_tensor = NoConvTensor(torch.tensor(
-                path.coefficients, dtype=math_dtype, device=device
-            ))
+            c_tensor = NoConvTensor(
+                torch.tensor(path.coefficients, dtype=math_dtype, device=device)
+            )
 
             constants[f"c{path_idx}"] = c_tensor
 
-            c = (
-                torch.fx.Proxy(graph.get_attr(f"c{path_idx}"), tracer=tracer)
-                .clone()
-            )
+            c = torch.fx.Proxy(graph.get_attr(f"c{path_idx}"), tracer=tracer).clone()
             # out = torch.tensor(c)
             out = torch.einsum(formula, c, *segments)
             out = out.to(dtype=inputs[0].dtype)
@@ -402,21 +359,7 @@ class _Wrapper(torch.nn.Module):
                     "input shape[-1] does not match operand size",
                 )
 
-        shape = broadcast_shapes([arg.shape[:-1] for arg in args])
-
-        args = [
-            (
-                arg.expand(shape + (arg.shape[-1],)).reshape(
-                    (prod(shape), arg.shape[-1])
-                )
-                if prod(arg.shape[:-1]) > 1
-                else arg.reshape((prod(arg.shape[:-1]), arg.shape[-1]))
-            )
-            for arg in args
-        ]
-        out = self.module(args)
-
-        return out.reshape(shape + (out.shape[-1],))
+        return self.module(args)
 
 
 def _tensor_product_cuda(
@@ -547,21 +490,13 @@ class FusedTensorProductOp3(torch.nn.Module):
 
     def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1 = self._perm(inputs[0], inputs[1])
-        assert x0.ndim >= 1, x0.ndim
-        assert x1.ndim >= 1, x1.ndim
-
-        shape = broadcast_shapes([x0.shape[:-1], x1.shape[:-1]])
-        x0 = _reshape(x0, shape)
-        x1 = _reshape(x1, shape)
 
         if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling FusedTensorProductOp3: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
 
-        out = self._f(x0, x1)
-
-        return out.reshape(shape + (out.shape[-1],))
+        return self._f(x0, x1)
 
 
 class FusedTensorProductOp4(torch.nn.Module):
@@ -603,23 +538,13 @@ class FusedTensorProductOp4(torch.nn.Module):
 
     def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1, x2 = self._perm(inputs[0], inputs[1], inputs[2])
-        assert x0.ndim >= 1, x0.ndim
-        assert x1.ndim >= 1, x1.ndim
-        assert x2.ndim >= 1, x2.ndim
-
-        shape = broadcast_shapes([x0.shape[:-1], x1.shape[:-1], x2.shape[:-1]])
-        x0 = _reshape(x0, shape)
-        x1 = _reshape(x1, shape)
-        x2 = _reshape(x2, shape)
 
         if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
 
-        out = self._f(x0, x1, x2)
-
-        return out.reshape(shape + (out.shape[-1],))
+        return self._f(x0, x1, x2)
 
 
 class TensorProductUniform1d(torch.nn.Module):
@@ -656,26 +581,13 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
 
     def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1 = inputs
-        assert x0.ndim >= 1, x0.ndim
-        assert x1.ndim >= 1, x1.ndim
-
-        shape = broadcast_shapes([x0.shape[:-1], x1.shape[:-1]])
-        x0 = _reshape(x0, shape)
-        x1 = _reshape(x1, shape)
-
-        if x0.ndim == 1:
-            x0 = x0.unsqueeze(0)
-        if x1.ndim == 1:
-            x1 = x1.unsqueeze(0)
 
         if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
 
-        out = self._f(x0, x1, x0)
-
-        return out.reshape(shape + (out.shape[-1],))
+        return self._f(x0, x1, x0)
 
 
 class TensorProductUniform4x1d(TensorProductUniform1d):
@@ -685,30 +597,13 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
 
     def forward(self, inputs: List[torch.Tensor]):
         x0, x1, x2 = inputs
-        assert x0.ndim >= 1, x0.ndim
-        assert x1.ndim >= 1, x1.ndim
-        assert x2.ndim >= 1, x2.ndim
-
-        shape = broadcast_shapes([x0.shape[:-1], x1.shape[:-1], x2.shape[:-1]])
-        x0 = _reshape(x0, shape)
-        x1 = _reshape(x1, shape)
-        x2 = _reshape(x2, shape)
-
-        if x0.ndim == 1:
-            x0 = x0.unsqueeze(0)
-        if x1.ndim == 1:
-            x1 = x1.unsqueeze(0)
-        if x2.ndim == 1:
-            x2 = x2.unsqueeze(0)
 
         if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling TensorProductUniform4x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
 
-        out = self._f(x0, x1, x2)
-
-        return out # .reshape(shape + (out.shape[-1],))
+        return self._f(x0, x1, x2)
 
 
 def _permutation_module(permutation: Tuple[int, ...]):
