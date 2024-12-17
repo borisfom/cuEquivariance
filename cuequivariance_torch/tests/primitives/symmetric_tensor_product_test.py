@@ -131,7 +131,7 @@ def test_math_dtype(dtype: torch.dtype, math_dtype: torch.dtype, use_fallback: b
     for param in m.parameters():
         assert False  # no parameters
 
-    m = m.float()
+    m = m.to(torch.float32)
     m = m.to(torch.float64)
 
     out2 = m(x0, i0, x1)
