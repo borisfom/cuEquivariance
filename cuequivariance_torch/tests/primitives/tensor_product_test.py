@@ -21,7 +21,6 @@ from tests.utils import (
 )
 
 import cuequivariance as cue
-import cuequivariance.segmented_tensor_product as stp
 import cuequivariance_torch as cuet
 from cuequivariance import descriptors
 
@@ -65,7 +64,7 @@ def make_descriptors():
         "u,,u",
         ",v,v",
     ]:
-        d = stp.SegmentedTensorProduct.from_subscripts(subscripts)
+        d = cue.SegmentedTensorProduct.from_subscripts(subscripts)
         for i in range(3):
             d.add_path(
                 *[None] * d.num_operands,
@@ -99,7 +98,7 @@ export_modes = ["script", "eager"]  # , "export", "onnx", "trt", "torch_trt", "j
 @pytest.mark.parametrize("use_fallback", [True, False])
 @pytest.mark.parametrize("mode", export_modes)
 def test_primitive_tensor_product_cuda_vs_fx(
-    d: stp.SegmentedTensorProduct,
+    d: cue.SegmentedTensorProduct,
     dtype: torch.dtype,
     math_dtype: torch.dtype,
     tol: float,
