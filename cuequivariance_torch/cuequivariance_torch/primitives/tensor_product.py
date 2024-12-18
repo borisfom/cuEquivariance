@@ -105,8 +105,9 @@ class TensorProduct(torch.nn.Module):
 
         Args:
             inputs (list of torch.Tensor): The input tensors. The number of input tensors should match the number of operands in the descriptor minus one.
-                Each input tensor should have a shape of ((batch,) operand_size), where `operand_size` corresponds to the size
-                of each operand as defined in the tensor product descriptor.
+                Each input tensor should have a shape of (batch, operand_size) or (1, operand_size)
+                where `operand_size` corresponds to the size of each operand as defined in
+                the tensor product descriptor.
 
         Returns:
             torch.Tensor:
@@ -117,10 +118,11 @@ class TensorProduct(torch.nn.Module):
         """
         return self.f(inputs)
 
+
 def to_notypeconv(self, *args, **kwargs):
     new_kwargs = kwargs.copy()
-    new_kwargs.pop('dtype', None)
-    new_args = [None if isinstance(a, torch.dtype) else a for a in args ]
+    new_kwargs.pop("dtype", None)
+    new_args = [None if isinstance(a, torch.dtype) else a for a in args]
     result = self.__original_to(*new_args, **new_kwargs)
     return result
 
@@ -128,7 +130,7 @@ def to_notypeconv(self, *args, **kwargs):
 def disable_type_conv(t):
     """
     This modifier can be used on Tensors or whole Modules
-    to prevent them from being modified during to(dtype=x) calls 
+    to prevent them from being modified during to(dtype=x) calls
     """
     t.__original_to = t.to
     t.to = to_notypeconv
@@ -358,11 +360,14 @@ class _Wrapper(torch.nn.Module):
         if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             for oid, arg in enumerate(args):
                 torch._assert(
-                    arg.shape[-1] == self.descriptor.operands[oid].size,
-                    "input shape[-1] does not match operand size",
+                    arg.ndim == 2,
+                    f"input {oid} should have ndim=2",
+                )
+                torch._assert(
+                    arg.shape[1] == self.descriptor.operands[oid].size,
+                    f"input {oid} should have shape (batch, {self.descriptor.operands[oid].size})",
                 )
 
-        args = [arg.unsqueeze(0) if arg.ndim == 1 else arg for arg in args]
         return self.module(args)
 
 
@@ -489,6 +494,17 @@ class FusedTensorProductOp3(torch.nn.Module):
                 f"Calling FusedTensorProductOp3: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
 
+        torch._assert(x0.ndim == 2, "input should be (batch, dim) or (1, dim)")
+        torch._assert(x1.ndim == 2, "input should be (batch, dim) or (1, dim)")
+
+        batch = max(x0.shape[0], x1.shape[0])
+
+        if batch > 1:
+            if x0.shape[0] == 1:
+                x0 = x0.squeeze(0)
+            if x1.shape[0] == 1:
+                x1 = x1.squeeze(0)
+
         # ops.FusedTensorProductOp3 expects inputs
         # of shape (Z, dim) or (dim,)
         return self._f(x0, x1)
@@ -539,6 +555,20 @@ class FusedTensorProductOp4(torch.nn.Module):
                 f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
 
+        torch._assert(x0.ndim == 2, "input should be (batch, dim) or (1, dim)")
+        torch._assert(x1.ndim == 2, "input should be (batch, dim) or (1, dim)")
+        torch._assert(x2.ndim == 2, "input should be (batch, dim) or (1, dim)")
+
+        batch = max(x0.shape[0], x1.shape[0], x2.shape[0])
+
+        if batch > 1:
+            if x0.shape[0] == 1:
+                x0 = x0.squeeze(0)
+            if x1.shape[0] == 1:
+                x1 = x1.squeeze(0)
+            if x2.shape[0] == 1:
+                x2 = x2.squeeze(0)
+
         # ops.FusedTensorProductOp4 expects inputs
         # of shape (Z, dim) or (dim,)
         return self._f(x0, x1, x2)
@@ -584,10 +614,8 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
                 f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
 
-        if x0.ndim == 1:
-            x0 = x0.unsqueeze(0)
-        if x1.ndim == 1:
-            x1 = x1.unsqueeze(0)
+        torch._assert(x0.ndim == 2, "input should be (batch, dim) or (1, dim)")
+        torch._assert(x1.ndim == 2, "input should be (batch, dim) or (1, dim)")
 
         # ops.TensorProductUniform1d expects inputs
         # of shape (Z, dim) or (1, dim)
@@ -607,12 +635,9 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
                 f"Calling TensorProductUniform4x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
 
-        if x0.ndim == 1:
-            x0 = x0.unsqueeze(0)
-        if x1.ndim == 1:
-            x1 = x1.unsqueeze(0)
-        if x2.ndim == 1:
-            x2 = x2.unsqueeze(0)
+        torch._assert(x0.ndim == 2, "input should be (batch, dim) or (1, dim)")
+        torch._assert(x1.ndim == 2, "input should be (batch, dim) or (1, dim)")
+        torch._assert(x2.ndim == 2, "input should be (batch, dim) or (1, dim)")
 
         # ops.TensorProductUniform1d expects inputs
         # of shape (Z, dim) or (1, dim)
