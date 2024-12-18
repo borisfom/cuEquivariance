@@ -158,3 +158,22 @@ def test_primitive_tensor_product_cuda_vs_fx(
 
     for g1, g2 in zip(double_grad1, double_grad2):
         torch.testing.assert_close(g1, g2.to(dtype), atol=100 * tol, rtol=100 * tol)
+
+
+@pytest.mark.parametrize("d", make_descriptors())
+@pytest.mark.parametrize("mode", export_modes)
+def test_script_tensor_product(d: cue.SegmentedTensorProduct, mode, tmp_path):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
+    batch = 12
+    inputs = [
+        torch.randn(batch, ope.size, device=device, dtype=torch.float32)
+        for ope in d.operands[:-1]
+    ]
+
+    m = cuet.TensorProduct(d, device=device, math_dtype=torch.float32)
+    module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
+    out1 = m(inputs)
+    out2 = module(inputs)
+    torch.testing.assert_close(out1, out2)
