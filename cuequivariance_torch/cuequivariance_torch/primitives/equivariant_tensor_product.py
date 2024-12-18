@@ -127,7 +127,7 @@ class EquivariantTensorProduct(torch.nn.Module):
         >>> e = cue.descriptors.fully_connected_tensor_product(
         ...    cue.Irreps("SO3", "2x1"), cue.Irreps("SO3", "2x1"), cue.Irreps("SO3", "2x1")
         ... )
-        >>> w = torch.ones(e.inputs[0].irreps.dim, device=device)
+        >>> w = torch.ones(1, e.inputs[0].irreps.dim, device=device)
         >>> x1 = torch.ones(17, e.inputs[1].irreps.dim, device=device)
         >>> x2 = torch.ones(17, e.inputs[2].irreps.dim, device=device)
         >>> tp = cuet.EquivariantTensorProduct(e, layout=cue.ir_mul, device=device)
