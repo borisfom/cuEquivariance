@@ -591,7 +591,7 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
 
         # ops.TensorProductUniform1d expects inputs
         # of shape (Z, dim) or (1, dim)
-        return self._f(x0, x1, x0)
+        return self._f(x0, x1)
 
 
 class TensorProductUniform4x1d(TensorProductUniform1d):
