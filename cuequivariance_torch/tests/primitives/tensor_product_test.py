@@ -89,13 +89,12 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
         (torch.bfloat16, torch.float32, 1.0),
     ]
 
-export_modes = ["script", "eager"]  # , "export", "onnx", "trt", "torch_trt", "jit"]
+export_modes = ["script", "export", "onnx", "trt", "jit"]
 
 
 @pytest.mark.parametrize("d", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, tol", settings)
 @pytest.mark.parametrize("use_fallback", [True, False])
-@pytest.mark.parametrize("mode", export_modes)
 def test_primitive_tensor_product_cuda_vs_fx(
     d: cue.SegmentedTensorProduct,
     dtype: torch.dtype,
@@ -107,10 +106,6 @@ def test_primitive_tensor_product_cuda_vs_fx(
 ):
     if use_fallback is False and not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
-    if use_fallback is True and mode not in ["eager", "script", "export"]:
-        pytest.skip(
-            "Only eager, script and export modes are supported for the fallback!"
-        )
 
     inputs = [
         torch.randn(
@@ -128,7 +123,6 @@ def test_primitive_tensor_product_cuda_vs_fx(
         math_dtype=math_dtype,
         use_fallback=use_fallback,
     )
-    m = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
 
     out1 = m(inputs)
 
@@ -162,7 +156,8 @@ def test_primitive_tensor_product_cuda_vs_fx(
 
 @pytest.mark.parametrize("d", make_descriptors())
 @pytest.mark.parametrize("mode", export_modes)
-def test_script_tensor_product(d: cue.SegmentedTensorProduct, mode, tmp_path):
+@pytest.mark.parametrize("use_fallback", [True, False])
+def test_script_tensor_product(d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
@@ -171,6 +166,11 @@ def test_script_tensor_product(d: cue.SegmentedTensorProduct, mode, tmp_path):
         torch.randn(batch, ope.size, device=device, dtype=torch.float32)
         for ope in d.operands[:-1]
     ]
+
+    # if use_fallback is True and mode not in ["eager", "script", "export"]:
+    #    pytest.skip(
+    #        "Only eager, script and export modes are supported for the fallback!"
+    #    )
 
     m = cuet.TensorProduct(d, device=device, math_dtype=torch.float32)
     module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)

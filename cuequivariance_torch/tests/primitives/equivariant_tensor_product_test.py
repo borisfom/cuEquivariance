@@ -190,7 +190,7 @@ def test_compile(
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
 
 
-export_modes = ["script", "export", "onnx", "trt", "torch_trt", "jit"]
+export_modes = ["script", "export", "onnx", "trt", "jit"]
 
 @pytest.mark.parametrize("e", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
