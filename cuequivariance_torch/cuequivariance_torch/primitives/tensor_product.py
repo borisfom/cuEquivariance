@@ -15,6 +15,7 @@
 import logging
 import math
 import warnings
+from types import MethodType
 from typing import List, Optional, OrderedDict, Tuple
 
 import torch
@@ -133,7 +134,7 @@ def disable_type_conv(t):
     to prevent them from being modified during to(dtype=x) calls
     """
     t.__original_to = t.to
-    t.to = to_notypeconv
+    t.to = MethodType(to_notypeconv, t)
     return t
 
 
