@@ -95,6 +95,7 @@ export_modes = ["script", "export", "onnx", "trt", "jit"]
 @pytest.mark.parametrize("d", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, tol", settings)
 @pytest.mark.parametrize("use_fallback", [True, False])
+@pytest.mark.parametrize("mode", export_modes)
 def test_primitive_tensor_product_cuda_vs_fx(
     d: cue.SegmentedTensorProduct,
     dtype: torch.dtype,
@@ -157,7 +158,9 @@ def test_primitive_tensor_product_cuda_vs_fx(
 @pytest.mark.parametrize("d", make_descriptors())
 @pytest.mark.parametrize("mode", export_modes)
 @pytest.mark.parametrize("use_fallback", [True, False])
-def test_script_tensor_product(d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path):
+def test_script_tensor_product(
+    d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path
+):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
