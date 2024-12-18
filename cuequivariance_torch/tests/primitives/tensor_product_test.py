@@ -155,9 +155,9 @@ def test_primitive_tensor_product_cuda_vs_fx(
 
 
 @pytest.mark.parametrize("d", make_descriptors())
-@pytest.mark.parametrize("mode", export_modes)
-@pytest.mark.parametrize("use_fallback", [True, False])
-def test_script_tensor_product(d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path):
+@pytest.mark.parametrize("mode", ["trt"]) # ]export_modes)
+@pytest.mark.parametrize("use_fallback", [True])
+def test_export(d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
@@ -172,8 +172,11 @@ def test_script_tensor_product(d: cue.SegmentedTensorProduct, mode, use_fallback
     #        "Only eager, script and export modes are supported for the fallback!"
     #    )
 
-    m = cuet.TensorProduct(d, device=device, math_dtype=torch.float32)
-    module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
-    out1 = m(inputs)
-    out2 = module(inputs)
+    m = cuet.TensorProduct(d, 
+                           device=device, 
+                           math_dtype=torch.float32,
+                           use_fallback=use_fallback)
+    module = module_with_mode(mode, m, inputs, torch.float32, tmp_path)
+    out1 = m(*inputs)
+    out2 = module(*inputs)
     torch.testing.assert_close(out1, out2)

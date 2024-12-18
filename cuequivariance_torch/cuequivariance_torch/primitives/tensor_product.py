@@ -99,7 +99,7 @@ class TensorProduct(torch.nn.Module):
         )
         return f"TensorProduct({self.descriptor} {has_cuda_kernel})"
 
-    def forward(self, inputs: List[torch.Tensor]):
+    def forward(self, x0:torch.Tensor, x1:torch.Tensor, x2:Optional[torch.Tensor]=None):
         r"""
         Perform the tensor product based on the specified descriptor.
 
@@ -115,7 +115,11 @@ class TensorProduct(torch.nn.Module):
                 `last_operand_size` is the size of the last operand in the descriptor.
 
         """
-        return self.f(inputs)
+        if x2 is None:
+            args = [x0, x1]
+        else:
+            args = [x0, x1, x2]
+        return self.f(args)
 
 def to_notypeconv(self, *args, **kwargs):
     new_kwargs = kwargs.copy()
@@ -160,6 +164,9 @@ def _tensor_product_fx(
             torch.fx.Proxy(graph.placeholder(f"input_{i}"), tracer)
             for i in range(num_inputs)
         ]
+        #for input in inputs:
+        #    if input.ndim == 1:
+        #        input = input.unsqueeze(0)
         for input in inputs:
             torch._assert(input.ndim == 2, "input should have ndim=2")
         operand_subscripts = [
@@ -362,7 +369,6 @@ class _Wrapper(torch.nn.Module):
                     "input shape[-1] does not match operand size",
                 )
 
-        args = [arg.unsqueeze(0) if arg.ndim == 1 else arg for arg in args]
         return self.module(args)
 
 
@@ -442,6 +448,7 @@ def _tensor_product_cuda(
         return FusedTensorProductOp3(descriptor, perm[:2], device, math_dtype)
     elif descriptor.num_operands == 4:
         return FusedTensorProductOp4(descriptor, perm[:3], device, math_dtype)
+    # return _Wrapper(
 
 
 class FusedTensorProductOp3(torch.nn.Module):
@@ -576,9 +583,8 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
     def __repr__(self):
         return f"TensorProductUniform3x1d({self.descriptor} (output last operand))"
 
-    def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
-        x0, x1 = inputs
-
+    def forward(self, x0:torch.Tensor, x1:torch.Tensor) -> torch.Tensor:
+        
         if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(
                 f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
@@ -599,8 +605,7 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
     def __repr__(self):
         return f"TensorProductUniform4x1d({self.descriptor} (output last operand))"
 
-    def forward(self, inputs: List[torch.Tensor]):
-        x0, x1, x2 = inputs
+    def forward(self, x0:torch.Tensor, x1:torch.Tensor, x2:torch.Tensor) -> torch.Tensor:
 
         if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
             logger.debug(

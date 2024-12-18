@@ -224,6 +224,7 @@ def test_export(
         torch.randn((1024, inp.irreps.dim), device=device, dtype=dtype)
         for inp in e.inputs
     ]
+    print(f"{len(inputs)} inputs")
     res = m(inputs)
     m_script = module_with_mode(mode, m, [exp_inputs], math_dtype, tmp_path)
     res_script = m_script(inputs)
