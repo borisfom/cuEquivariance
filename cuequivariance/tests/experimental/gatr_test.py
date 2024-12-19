@@ -12,19 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import jax
-import jax.numpy as jnp
+from cuequivariance.experimental.gatr import (
+    gatr_geometric_product,
+    gatr_linear,
+    gatr_outer_product,
+)
 
-import cuequivariance as cue
-import cuequivariance_jax as cuex
+
+def test_geometric_product():
+    gatr_geometric_product()
 
 
-@cue.assume("SO3", cue.ir_mul)
-def test_vmap():
-    def f(x):
-        return x
+def test_outer_product():
+    gatr_outer_product()
 
-    x = cuex.RepArray({0: "1"}, jnp.zeros((3, 2)))
-    y = jax.jit(cuex.vmap(f, 1, 0))(x)
-    assert y.shape == (2, 3)
-    assert y.reps == {1: cue.IrrepsAndLayout("1")}
+
+def test_linear():
+    gatr_linear(32, 32)

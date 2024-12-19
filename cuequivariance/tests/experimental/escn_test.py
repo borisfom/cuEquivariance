@@ -12,25 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import jax
-
 import cuequivariance as cue
-import cuequivariance_jax as cuex
+from cuequivariance.experimental.escn import escn_tp, escn_tp_compact
 
 
-def test_special_double_backward():
-    e = cue.descriptors.symmetric_contraction(
-        2 * cue.Irreps("O3", "0e + 1o + 2e"), 2 * cue.Irreps("O3", "0e + 1o"), [1, 2]
+def test_escn():
+    escn_tp(
+        cue.Irreps("O3", "32x0e + 32x1o"),
+        cue.Irreps("O3", "32x0e + 32x1o"),
+        m_max=2,
     )
-    irreps_w = e.inputs[0].irreps
-    irreps_x = e.inputs[1].irreps
-    h = cuex.equivariant_tensor_product(e)
 
-    h0 = lambda w, x: h(w, x).array.sum() ** 2  # noqa
-    h1 = lambda w, x: jax.grad(h0, 1)(w, x).array.sum() ** 2  # noqa
 
-    w = jax.random.normal(jax.random.key(0), (1, irreps_w.dim))
-    x = cuex.RepArray(
-        irreps_x, jax.random.normal(jax.random.key(1), (3, irreps_x.dim)), cue.ir_mul
+def test_escn_compact():
+    escn_tp_compact(
+        cue.Irreps("SO3", "32x0 + 32x1"),
+        cue.Irreps("SO3", "32x0 + 32x1"),
+        m_max=2,
     )
-    jax.grad(h1, 0)(w, x)
