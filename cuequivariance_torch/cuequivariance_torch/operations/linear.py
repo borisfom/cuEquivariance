@@ -75,7 +75,7 @@ class Linear(torch.nn.Module):
             if not self.shared_weights:
                 raise ValueError("Internal weights should be shared")
             self.weight = torch.nn.Parameter(
-                torch.randn(self.weight_numel, device=device, dtype=dtype)
+                torch.randn(1, self.weight_numel, device=device, dtype=dtype)
             )
         else:
             self.weight = None
@@ -119,11 +119,7 @@ class Linear(torch.nn.Module):
 
             weight = self.weight
 
-        if weight is not None:
-            if self.shared_weights and weight.ndim != 1:
-                raise ValueError("Shared weights should be 1D tensor")
-            if not self.shared_weights and weight.ndim != 2:
-                raise ValueError("Weights should be 2D tensor")
-        else:
+        if weight is None:
             raise ValueError("Weights should not be None")
+
         return self.f([weight, x])
