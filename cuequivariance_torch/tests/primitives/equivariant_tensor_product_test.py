@@ -215,8 +215,7 @@ def test_export(
         device=device,
     )
     exp_inputs = [
-        torch.randn((512, inp.irreps.dim), device=device, dtype=dtype)
-        for inp in e.inputs
+        torch.randn((512, inp.dim), device=device, dtype=dtype) for inp in e.inputs
     ]
     inputs = [
         torch.randn((1024, inp.dim), device=device, dtype=dtype) for inp in e.inputs
