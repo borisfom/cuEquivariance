@@ -46,7 +46,7 @@ class SphericalHarmonics(nn.Module):
         assert self.ls == sorted(set(self.ls))
         self.normalize = normalize
 
-        self.m = cuet.EquivariantTensorProduct(
+        self.f = cuet.EquivariantTensorProduct(
             descriptors.spherical_harmonics(cue.SO3(1), self.ls),
             layout=cue.ir_mul,
             device=device,
@@ -57,18 +57,15 @@ class SphericalHarmonics(nn.Module):
     def forward(self, vectors: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            vectors (torch.Tensor): Input vectors of shape (..., 3).
+            vectors (torch.Tensor): Input vectors of shape (batch, 3).
 
         Returns:
-            torch.Tensor: The spherical harmonics of the input vectors of shape (..., dim)
+            torch.Tensor: The spherical harmonics of the input vectors of shape (batch, dim),
             where dim is the sum of 2*l+1 for l in ls.
         """
-        assert vectors.shape[-1] == 3
+        torch._assert(vectors.ndim == 2, "Input must have shape (batch, 3)")
 
         if self.normalize:
-            vectors = torch.nn.functional.normalize(vectors, dim=-1)
+            vectors = torch.nn.functional.normalize(vectors, dim=1)
 
-        x = vectors.reshape(-1, 3)
-        y = self.m([x])
-        y = y.reshape(vectors.shape[:-1] + (y.shape[-1],))
-        return y
+        return self.f([vectors])

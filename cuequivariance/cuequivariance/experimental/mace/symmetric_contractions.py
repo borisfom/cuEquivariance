@@ -44,7 +44,7 @@ def symmetric_contraction(
 
         cuex.equivariant_tensor_product(e, w, cuex.randn(jax.random.key(1), e.inputs[1]))
     """
-    assert max(degrees) > 0
+    assert min(degrees) > 0
     e1 = cue.EquivariantTensorProduct.stack(
         [
             cue.EquivariantTensorProduct.stack(
@@ -147,8 +147,11 @@ def _symmetric_contraction(
     d = d.append_modes_to_all_operands("u", {"u": mul})
     return cue.EquivariantTensorProduct(
         [d],
-        [irreps_in.new_scalars(d.operands[0].size), mul * irreps_in, mul * irreps_out],
-        layout=cue.ir_mul,
+        [
+            cue.IrrepsAndLayout(irreps_in.new_scalars(d.operands[0].size), cue.ir_mul),
+            cue.IrrepsAndLayout(mul * irreps_in, cue.ir_mul),
+            cue.IrrepsAndLayout(mul * irreps_out, cue.ir_mul),
+        ],
     )
 
 
@@ -182,6 +185,8 @@ def U_matrix_real(
 def _wigner_nj(
     irreps_in: cue.Irreps, degree: int, filter_ir_mid: Optional[frozenset[cue.Irrep]]
 ) -> list[tuple[cue.Irrep, np.ndarray]]:
+    assert degree > 0
+
     if degree == 1:
         ret = []
         e = np.eye(irreps_in.dim)
