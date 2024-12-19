@@ -21,16 +21,22 @@ from cuequivariance import descriptors
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
-list_of_irreps = [
-    cue.Irreps("O3", "32x0e + 32x1o"),
-    cue.Irreps("O3", "2x1o + 5x0e + 2e + 1e + 1o"),
-    cue.Irreps("O3", "2e + 0x0e + 0o + 0x1e + 1e"),
-]
 
-
-@pytest.mark.parametrize("irreps1", list_of_irreps)
-@pytest.mark.parametrize("irreps2", [irreps.set_mul(1) for irreps in list_of_irreps])
-@pytest.mark.parametrize("irreps3", list_of_irreps)
+@pytest.mark.parametrize(
+    "irreps1, irreps2, irreps3",
+    [
+        (
+            cue.Irreps("O3", "32x0e + 32x1o"),
+            cue.Irreps("O3", "0e + 1o + 2e"),
+            cue.Irreps("O3", "32x0e + 32x1o"),
+        ),
+        (
+            cue.Irreps("O3", "2x1o + 3x0e + 4x2e + 3x1e + 2x1o"),
+            cue.Irreps("O3", "1o + 2e"),
+            cue.Irreps("O3", "2x1o + 5x0e + 1e + 1o"),
+        ),
+    ],
+)
 @pytest.mark.parametrize("layout", [cue.ir_mul, cue.mul_ir])
 @pytest.mark.parametrize("use_fallback", [False, True])
 @pytest.mark.parametrize("batch", [1, 32])
@@ -104,7 +110,7 @@ def test_channel_wise_bwd_bwd(irreps: cue.Irreps):
 
         torch.manual_seed(0)
         w = torch.randn(
-            m.weight_numel, device="cuda", requires_grad=True, dtype=torch.float64
+            1, m.weight_numel, device="cuda", requires_grad=True, dtype=torch.float64
         )
 
         (grad1, grad2, grad3) = torch.autograd.grad(

@@ -86,7 +86,7 @@ class ChannelWiseTensorProduct(torch.nn.Module):
             if not self.shared_weights:
                 raise ValueError("Internal weights should be shared")
             self.weight = torch.nn.Parameter(
-                torch.randn(self.weight_numel, device=device, dtype=dtype)
+                torch.randn(1, self.weight_numel, device=device, dtype=dtype)
             )
         else:
             self.weight = None
@@ -139,10 +139,5 @@ class ChannelWiseTensorProduct(torch.nn.Module):
                 raise ValueError("Internal weights are used, weight should be None")
 
             weight = self.weight
-
-        if self.shared_weights and weight.ndim != 1:
-            raise ValueError("Shared weights should be 1D tensor")
-        if not self.shared_weights and weight.ndim != 2:
-            raise ValueError("Weights should be 2D tensor")
 
         return self.f([weight, x1, x2])
