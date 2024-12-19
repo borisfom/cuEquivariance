@@ -15,7 +15,7 @@
 import logging
 import math
 import warnings
-from types import MethodType
+from functools import partial
 from typing import List, Optional, OrderedDict, Tuple
 
 import torch
@@ -120,11 +120,11 @@ class TensorProduct(torch.nn.Module):
         return self.f(inputs)
 
 
-def to_notypeconv(self, *args, **kwargs):
+def to_notypeconv(t, *args, **kwargs):
     new_kwargs = kwargs.copy()
     new_kwargs.pop("dtype", None)
     new_args = [None if isinstance(a, torch.dtype) else a for a in args]
-    result = self.__original_to(*new_args, **new_kwargs)
+    result = t.__original_to(*new_args, **new_kwargs)
     return result
 
 
@@ -134,7 +134,7 @@ def disable_type_conv(t):
     to prevent them from being modified during to(dtype=x) calls
     """
     t.__original_to = t.to
-    t.to = MethodType(to_notypeconv, t)
+    t.to = partial(to_notypeconv, t)
     return t
 
 
