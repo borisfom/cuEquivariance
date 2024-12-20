@@ -164,6 +164,7 @@ def test_precision_cuda_vs_fx(
 
 
 export_modes = ["compile", "script", "jit"]
+# "export" does not support the change of batch size
 
 
 @pytest.mark.parametrize("e", make_descriptors())
@@ -191,8 +192,7 @@ def test_export(
         device=device,
     )
     inputs = [
-        torch.randn((512, inp.irreps.dim), device=device, dtype=dtype)
-        for inp in e.inputs
+        torch.randn((512, inp.dim), device=device, dtype=dtype) for inp in e.inputs
     ]
     res = m(inputs)
     m_script = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)

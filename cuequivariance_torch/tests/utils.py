@@ -107,13 +107,13 @@ def verify_trt(module, onnx_module, inputs, dtype):
 
 
 def module_with_mode(
-    mode,
-    module,
-    inputs,
-    math_dtype,
-    tmp_path,
-    grad_modes=["eager", "compile", "jit", "export"],
-):
+    mode: str,
+    module: torch.nn.Module,
+    inputs: list[torch.Tensor] | list[list[torch.Tensor]],
+    math_dtype: torch.dtype,
+    tmp_path: str,
+    grad_modes: list[str] = ["eager", "compile", "jit", "export"],
+) -> torch.nn.Module:
     if isinstance(inputs[0], list):
         dtype = inputs[0][0].dtype
     else:
