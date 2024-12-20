@@ -1,5 +1,8 @@
 import pytest
 import torch
+from tests.utils import (
+    module_with_mode,
+)
 
 import cuequivariance as cue
 from cuequivariance_torch.primitives.symmetric_tensor_product import (
@@ -10,9 +13,6 @@ from cuequivariance_torch.primitives.tensor_product import (
     FusedTensorProductOp4,
     TensorProductUniform3x1d,
     TensorProductUniform4x1d,
-)
-from tests.utils import (
-    module_with_mode,
 )
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
@@ -58,7 +58,9 @@ def test_script_fused_tp_3():
 
     assert module([x0, x1]).shape == (batch, d.operands[2].size)
 
+
 export_modes = ["script", "export"]
+
 
 @pytest.mark.parametrize("mode", export_modes)
 def test_script_fused_tp_4(mode, tmp_path):
@@ -78,13 +80,14 @@ def test_script_fused_tp_4(mode, tmp_path):
     x0 = torch.randn(batch, d.operands[0].size, device=device, dtype=torch.float32)
     x1 = torch.randn(batch, d.operands[1].size, device=device, dtype=torch.float32)
     x2 = torch.randn(batch, d.operands[2].size, device=device, dtype=torch.float32)
-    
+
     inputs = [x0, x1, x2]
     m = FusedTensorProductOp4(d, [0, 1, 2], device, torch.float32)
     module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
-    out1=m(inputs)
-    out2=module(inputs)
+    out1 = m(inputs)
+    out2 = module(inputs)
     torch.testing.assert_close(out1, out2)
+
 
 @pytest.mark.parametrize("mode", export_modes)
 def test_script_uniform_tp_3(mode, tmp_path):
@@ -106,8 +109,8 @@ def test_script_uniform_tp_3(mode, tmp_path):
 
     m = TensorProductUniform3x1d(d, device, torch.float32)
     module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
-    out1=m(inputs)
-    out2=module(inputs)
+    out1 = m(inputs)
+    out2 = module(inputs)
     torch.testing.assert_close(out1, out2)
 
 
@@ -130,8 +133,8 @@ def test_script_uniform_tp_4(mode, tmp_path):
     x2 = torch.randn(batch, d.operands[2].size, device=device, dtype=torch.float32)
     inputs = [x0, x1, x2]
 
-    m= TensorProductUniform4x1d(d, device, torch.float32)
+    m = TensorProductUniform4x1d(d, device, torch.float32)
     module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
-    out1=m(inputs)
-    out2=module(inputs)
+    out1 = m(inputs)
+    out2 = module(inputs)
     torch.testing.assert_close(out1, out2)

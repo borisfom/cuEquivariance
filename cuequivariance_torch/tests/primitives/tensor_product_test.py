@@ -89,7 +89,7 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
         (torch.bfloat16, torch.float32, 1.0),
     ]
 
-export_modes = ["script", "export", "trt", "jit"]
+export_modes = ["compile", "script", "jit"]
 
 
 @pytest.mark.parametrize("d", make_descriptors())

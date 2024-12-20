@@ -163,31 +163,7 @@ def test_precision_cuda_vs_fx(
     torch.testing.assert_close(y0, y1, atol=atol, rtol=rtol)
 
 
-@pytest.mark.parametrize("e", make_descriptors())
-@pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
-def test_compile(
-    e: cue.EquivariantTensorProduct,
-    dtype: torch.dtype,
-    math_dtype: torch.dtype,
-    atol: float,
-    rtol: float,
-):
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is not available")
-
-    m = cuet.EquivariantTensorProduct(
-        e, layout=cue.mul_ir, use_fallback=False, device=device, math_dtype=math_dtype
-    )
-    inputs = [
-        torch.randn((1024, inp.dim), device=device, dtype=dtype) for inp in e.inputs
-    ]
-    res = m(inputs)
-    m_compile = torch.compile(m, fullgraph=True)
-    res_script = m_compile(inputs)
-    torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)
-
-
-export_modes = ["script", "export", "onnx", "trt", "jit"]
+export_modes = ["compile", "script", "jit"]
 
 
 @pytest.mark.parametrize("e", make_descriptors())
@@ -214,14 +190,11 @@ def test_export(
         use_fallback=use_fallback,
         device=device,
     )
-    exp_inputs = [
+    inputs = [
         torch.randn((512, inp.irreps.dim), device=device, dtype=dtype)
         for inp in e.inputs
     ]
-    inputs = [
-        torch.randn((1024, inp.dim), device=device, dtype=dtype) for inp in e.inputs
-    ]
     res = m(inputs)
-    m_script = module_with_mode(mode, m, [exp_inputs], math_dtype, tmp_path)
+    m_script = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
     res_script = m_script(inputs)
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)

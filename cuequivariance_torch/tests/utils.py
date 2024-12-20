@@ -126,11 +126,7 @@ def module_with_mode(
 
     with torch.set_grad_enabled(mode in grad_modes):
         if mode == "compile":
-            import sys
-
-            if sys.version_info.major == 3 and sys.version_info.minor >= 12:
-                pytest.skip("torch dynamo needs cpy <= 3.11")
-                module = torch.compile(module)
+            module = torch.compile(module, fullgraph=True)
         elif mode == "fx":
             module = torch.fx.symbolic_trace(module)
         elif mode == "script":
