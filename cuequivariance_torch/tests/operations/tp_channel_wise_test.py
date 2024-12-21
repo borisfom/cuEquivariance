@@ -14,6 +14,9 @@
 # limitations under the License.
 import pytest
 import torch
+from tests.utils import (
+    module_with_mode,
+)
 
 import cuequivariance as cue
 import cuequivariance_torch as cuet
@@ -21,22 +24,21 @@ from cuequivariance import descriptors
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
+irreps = [
+    (
+        cue.Irreps("O3", "32x0e + 32x1o"),
+        cue.Irreps("O3", "0e + 1o + 2e"),
+        cue.Irreps("O3", "32x0e + 32x1o"),
+    ),
+    (
+        cue.Irreps("O3", "2x1o + 3x0e + 4x2e + 3x1e + 2x1o"),
+        cue.Irreps("O3", "1o + 2e"),
+        cue.Irreps("O3", "2x1o + 5x0e + 1e + 1o"),
+    ),
+]
 
-@pytest.mark.parametrize(
-    "irreps1, irreps2, irreps3",
-    [
-        (
-            cue.Irreps("O3", "32x0e + 32x1o"),
-            cue.Irreps("O3", "0e + 1o + 2e"),
-            cue.Irreps("O3", "32x0e + 32x1o"),
-        ),
-        (
-            cue.Irreps("O3", "2x1o + 3x0e + 4x2e + 3x1e + 2x1o"),
-            cue.Irreps("O3", "1o + 2e"),
-            cue.Irreps("O3", "2x1o + 5x0e + 1e + 1o"),
-        ),
-    ],
-)
+
+@pytest.mark.parametrize("irreps1, irreps2, irreps3", irreps)
 @pytest.mark.parametrize("layout", [cue.ir_mul, cue.mul_ir])
 @pytest.mark.parametrize("use_fallback", [False, True])
 @pytest.mark.parametrize("batch", [1, 32])
@@ -76,6 +78,50 @@ def test_channel_wise_fwd(
     out2 = m2([m1.weight, x1, x2])
 
     torch.testing.assert_close(out1, out2, atol=1e-5, rtol=1e-5)
+
+
+export_modes = ["compile", "script", "jit"]
+
+
+@pytest.mark.parametrize("irreps1, irreps2, irreps3", irreps)
+@pytest.mark.parametrize("layout", [cue.ir_mul, cue.mul_ir])
+@pytest.mark.parametrize("use_fallback", [False, True])
+@pytest.mark.parametrize("batch", [1, 32])
+@pytest.mark.parametrize("mode", export_modes)
+def test_export(
+    irreps1: cue.Irreps,
+    irreps2: cue.Irreps,
+    irreps3: cue.Irreps,
+    layout: cue.IrrepsLayout,
+    use_fallback: bool,
+    batch: int,
+    mode: str,
+    tmp_path: str,
+):
+    dtype = torch.float32
+    if use_fallback is False and not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
+    m1 = cuet.ChannelWiseTensorProduct(
+        irreps1,
+        irreps2,
+        irreps3,
+        shared_weights=True,
+        internal_weights=True,
+        layout=layout,
+        device=device,
+        dtype=dtype,
+        use_fallback=use_fallback,
+    )
+    x1 = torch.randn(batch, irreps1.dim, dtype=dtype).to(device)
+    x2 = torch.randn(batch, irreps2.dim, dtype=dtype).to(device)
+
+    inputs = (x1, x2)
+    out1 = m1(x1, x2)
+
+    m1 = module_with_mode(mode, m1, inputs, dtype, tmp_path)
+    out2 = m1(*inputs)
+    torch.testing.assert_close(out1, out2)
 
 
 @pytest.mark.parametrize("irreps", ["32x0", "2x0 + 3x1"])

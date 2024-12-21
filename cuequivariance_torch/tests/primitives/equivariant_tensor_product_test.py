@@ -195,6 +195,6 @@ def test_export(
         torch.randn((512, inp.dim), device=device, dtype=dtype) for inp in e.inputs
     ]
     res = m(inputs)
-    m_script = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
-    res_script = m_script(inputs)
+    m = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
+    res_script = m(inputs)
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)

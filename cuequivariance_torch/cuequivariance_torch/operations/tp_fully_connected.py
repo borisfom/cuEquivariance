@@ -138,7 +138,10 @@ class FullyConnectedTensorProduct(torch.nn.Module):
         if self.internal_weights:
             if weight is not None:
                 raise ValueError("Internal weights are used, weight should be None")
-
-            weight = self.weight
-
-        return self.f([weight, x1, x2])
+            return self.f([self.weight, x1, x2])
+        else:
+            if weight is None:
+                raise ValueError(
+                    "Internal weights are not used, weight should not be None"
+                )
+            return self.f([weight, x1, x2])

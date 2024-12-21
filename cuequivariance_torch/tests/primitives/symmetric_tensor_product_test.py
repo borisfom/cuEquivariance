@@ -14,6 +14,9 @@
 # limitations under the License.
 import pytest
 import torch
+from tests.utils import (
+    module_with_mode,
+)
 
 import cuequivariance as cue
 import cuequivariance.segmented_tensor_product as stp
@@ -62,8 +65,6 @@ def test_primitive_indexed_symmetric_tensor_product_cuda_vs_fx(
     m = cuet.IWeightedSymmetricTensorProduct(
         ds, math_dtype=math_dtype, device=device, use_fallback=use_fallback
     )
-
-    m = torch.jit.script(m)
 
     x0 = torch.randn((2, m.x0_size), device=device, dtype=dtype, requires_grad=True)
     i0 = torch.tensor([0, 1, 0], dtype=torch.int32, device=device)
@@ -140,3 +141,36 @@ def test_math_dtype(dtype: torch.dtype, math_dtype: torch.dtype, use_fallback: b
     assert out1.dtype == dtype
     assert out2.dtype == dtype
     assert (out1 == out2).all()
+
+
+export_modes = ["compile", "script", "jit"]
+
+
+@pytest.mark.parametrize("ds", make_descriptors())
+@pytest.mark.parametrize("mode", export_modes)
+@pytest.mark.parametrize("use_fallback", [True, False])
+def test_export(
+    ds: list[stp.SegmentedTensorProduct],
+    mode: str,
+    use_fallback: bool,
+    tmp_path,
+):
+    dtype = torch.float32
+    math_dtype = torch.float32
+
+    if use_fallback is True and mode in ["trt"]:
+        pytest.skip(f"{mode} not supported for the fallback!")
+
+    m = cuet.IWeightedSymmetricTensorProduct(
+        ds, math_dtype=math_dtype, device=device, use_fallback=use_fallback
+    )
+    x0 = torch.randn((2, m.x0_size), device=device, dtype=dtype, requires_grad=True)
+    i0 = torch.tensor([0, 1, 0], dtype=torch.int32, device=device)
+    x1 = torch.randn(
+        (i0.size(0), m.x1_size), device=device, dtype=dtype, requires_grad=True
+    )
+    inputs = (x0, i0, x1)
+    out1 = m(*inputs)
+    m = module_with_mode(mode, m, inputs, torch.float32, tmp_path)
+    out2 = m(*inputs)
+    torch.testing.assert_close(out1, out2)

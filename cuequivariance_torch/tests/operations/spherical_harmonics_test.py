@@ -15,6 +15,9 @@
 import numpy as np
 import pytest
 import torch
+from tests.utils import (
+    module_with_mode,
+)
 
 import cuequivariance as cue
 import cuequivariance_torch as cuet
@@ -69,3 +72,28 @@ def test_spherical_harmonics_full(dtype, ls: list[int], use_fallback: bool):
     yl = m(vec)
     assert yl.shape[0] == 10
     assert yl.shape[1] == sum(2 * ell + 1 for ell in ls)
+
+
+export_modes = ["compile", "script", "jit"]
+
+
+@pytest.mark.parametrize("dtype", data_types)
+@pytest.mark.parametrize("ls", [[0], [1], [2], [0, 1], [0, 1, 2]])
+@pytest.mark.parametrize("use_fallback", [False, True])
+@pytest.mark.parametrize("mode", export_modes)
+def test_export(dtype, ls: list[int], use_fallback: bool, mode: str, tmp_path: str):
+    if use_fallback is False and not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
+    tol = 1e-5
+    if dtype in [torch.float16, torch.bfloat16]:
+        tol = 1e-2
+    m = cuet.SphericalHarmonics(ls, False, use_fallback=use_fallback, device=device)
+
+    vec = torch.randn(10, 3, device=device, dtype=dtype)
+    inputs = (vec,)
+    out1 = m(vec)
+
+    m = module_with_mode(mode, m, inputs, dtype, tmp_path)
+    out2 = m(*inputs)
+    torch.testing.assert_close(out1, out2, atol=tol, rtol=tol)

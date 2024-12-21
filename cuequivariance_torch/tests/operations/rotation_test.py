@@ -14,6 +14,9 @@
 # limitations under the License.
 import pytest
 import torch
+from tests.utils import (
+    module_with_mode,
+)
 
 import cuequivariance as cue
 import cuequivariance_torch as cuet
@@ -62,3 +65,25 @@ def test_inversion(use_fallback: bool):
         )(torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]], device=device)),
         torch.tensor([[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0]], device=device),
     )
+
+
+export_modes = ["compile", "script", "jit"]
+
+
+@pytest.mark.parametrize("mode", export_modes)
+def test_export(mode: str, tmp_path: str):
+    irreps = cue.Irreps("SO3", "3x0 + 1 + 0 + 4x2 + 4")
+    dtype = torch.float32
+    alpha = torch.tensor([0.3]).to(device)
+    beta = torch.tensor([0.4]).to(device)
+    gamma = torch.tensor([-0.5]).to(device)
+
+    m = cuet.Rotation(irreps, layout=cue.ir_mul).to(device)
+
+    x = torch.randn(10, irreps.dim).to(device)
+    inputs = (gamma, beta, alpha, x)
+
+    out1 = m(*inputs)
+    m = module_with_mode(mode, m, inputs, dtype, tmp_path)
+    out2 = m(*inputs)
+    torch.testing.assert_close(out1, out2)
