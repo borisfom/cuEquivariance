@@ -135,7 +135,7 @@ class FullyConnectedTensorProduct(torch.nn.Module):
                 or if shared weights are used and weight is not a 1D tensor,
                 or if shared weights are not used and weight is not a 2D tensor.
         """
-        if self.internal_weights:
+        if self.weight is not None:
             if weight is not None:
                 raise ValueError("Internal weights are used, weight should be None")
             return self.f([self.weight, x1, x2])
@@ -144,4 +144,5 @@ class FullyConnectedTensorProduct(torch.nn.Module):
                 raise ValueError(
                     "Internal weights are not used, weight should not be None"
                 )
-            return self.f([weight, x1, x2])
+            else:
+                return self.f([weight, x1, x2])

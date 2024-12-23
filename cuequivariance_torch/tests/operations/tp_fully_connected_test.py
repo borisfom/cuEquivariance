@@ -83,6 +83,7 @@ def test_fully_connected(
 
 @pytest.mark.parametrize("irreps1, irreps2, irreps3", irreps)
 @pytest.mark.parametrize("layout", [cue.ir_mul, cue.mul_ir])
+@pytest.mark.parametrize("internal_weights", [False, True])
 @pytest.mark.parametrize("use_fallback", [False, True])
 @pytest.mark.parametrize("mode", export_modes)
 def test_export(
@@ -90,6 +91,7 @@ def test_export(
     irreps2: cue.Irreps,
     irreps3: cue.Irreps,
     layout: cue.IrrepsLayout,
+    internal_weights: bool,
     use_fallback: bool,
     mode: str,
     tmp_path: str,
@@ -102,7 +104,7 @@ def test_export(
         irreps2,
         irreps3,
         shared_weights=True,
-        internal_weights=True,
+        internal_weights=internal_weights,
         layout=layout,
         device=device,
         dtype=dtype,
@@ -112,7 +114,12 @@ def test_export(
     x1 = torch.randn(32, irreps1.dim, dtype=dtype).to(device)
     x2 = torch.randn(32, irreps2.dim, dtype=dtype).to(device)
 
-    inputs = (x1, x2)
+    if internal_weights:
+        inputs = (x1, x2)
+    else:
+        weights = torch.randn(1, m1.weight_numel, device=device, dtype=dtype)
+        inputs = (x1, x2, weights)
+
     out1 = m1(*inputs)
 
     m1 = module_with_mode(mode, m1, inputs, dtype, tmp_path)
