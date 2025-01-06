@@ -36,7 +36,7 @@ class TransposeIrrepsLayout(torch.nn.Module):
         source: cue.IrrepsLayout,
         target: cue.IrrepsLayout,
         device: Optional[torch.device] = None,
-        use_fallback: Optional[bool] = False,
+        use_fallback: Optional[bool] = None,
     ):
         super().__init__()
 
@@ -85,7 +85,7 @@ class TransposeSegments(torch.nn.Module):
         self,
         segments: list[tuple[int, int]],
         device: Optional[torch.device] = None,
-        use_fallback: Optional[bool] = False,
+        use_fallback: Optional[bool] = None,
     ):
         super().__init__()
 
@@ -99,7 +99,8 @@ class TransposeSegments(torch.nn.Module):
                 except ImportError:
                     pass
                 else:
-                    self.f = _transpose(info).to(device=device)
+                    if torch.cuda.is_available():
+                        self.f = _transpose(info).to(device=device)
 
             if use_fallback is False and self.f is None:
                 raise RuntimeError("CUDA kernel not available for TransposeSegments.")
