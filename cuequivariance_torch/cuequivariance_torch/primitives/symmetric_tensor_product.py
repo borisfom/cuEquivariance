@@ -224,6 +224,9 @@ class CUDAKernel(torch.nn.Module):
     ):
         super().__init__()
 
+        if not torch.cuda.is_available():
+            raise NotImplementedError("CUDA is not available.")
+
         max_degree = max(d.num_operands - 2 for d in ds)
 
         if max_degree > 6:

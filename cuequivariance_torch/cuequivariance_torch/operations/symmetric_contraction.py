@@ -43,15 +43,15 @@ class SymmetricContraction(torch.nn.Module):
                 If `True`, a PyTorch fallback method is used regardless of CUDA kernel availability.
 
     Examples:
+        >>> device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         >>> irreps_in = cue.Irreps("O3", "32x0e + 32x1o")
         >>> irreps_out = cue.Irreps("O3", "32x0e")
-        >>> layer = SymmetricContraction(irreps_in, irreps_out, contraction_degree=3, num_elements=5, layout=cue.ir_mul, dtype=torch.float32)
+        >>> layer = SymmetricContraction(irreps_in, irreps_out, contraction_degree=3, num_elements=5, layout=cue.ir_mul, dtype=torch.float32, device=device)
 
         Now `layer` can be used as part of a PyTorch model.
 
         The argument `original_mace` can be set to `True` to emulate the original MACE implementation.
 
-        >>> device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         >>> feats_irreps = cue.Irreps("O3", "32x0e + 32x1o + 32x2e")
         >>> target_irreps = cue.Irreps("O3", "32x0e + 32x1o")
         >>> # OLD FUNCTION DEFINITION:
