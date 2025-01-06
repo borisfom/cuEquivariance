@@ -193,8 +193,9 @@ def module_with_mode(
         else:
             raise ValueError(f"No such mode: {mode}")
 
-    torch.cuda.synchronize()
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
 
     return module
 

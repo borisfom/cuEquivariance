@@ -72,6 +72,9 @@ export_modes = ["compile", "script", "jit"]
 
 @pytest.mark.parametrize("mode", export_modes)
 def test_export(mode: str, tmp_path: str):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
     irreps = cue.Irreps("SO3", "3x0 + 1 + 0 + 4x2 + 4")
     dtype = torch.float32
     alpha = torch.tensor([0.3]).to(device)

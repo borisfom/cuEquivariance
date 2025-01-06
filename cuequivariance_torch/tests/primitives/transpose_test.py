@@ -59,6 +59,9 @@ export_modes = ["compile", "script", "jit"]
 @pytest.mark.parametrize("mode", export_modes)
 @pytest.mark.parametrize("use_fallback", [True, False])
 def test_export(mode, use_fallback, tmp_path):
+    if not use_fallback and not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
     dtype = torch.float32
     x = torch.tensor(
         [[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 10, 11, 12, 13]], dtype=dtype, device=device

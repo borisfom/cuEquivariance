@@ -51,6 +51,7 @@ def test_tensor_product_conv_equivariance(
         mlp_activation=mlp_activation,
         batch_norm=batch_norm,
         layout=layout,
+        use_fallback=not torch.cuda.is_available(),
     ).to(device)
 
     num_src_nodes, num_dst_nodes = 9, 7

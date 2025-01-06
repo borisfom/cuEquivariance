@@ -155,6 +155,9 @@ def test_export(
     use_fallback: bool,
     tmp_path,
 ):
+    if not use_fallback and not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
     dtype = torch.float32
     math_dtype = torch.float32
 

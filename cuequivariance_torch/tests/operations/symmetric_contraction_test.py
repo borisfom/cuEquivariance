@@ -37,6 +37,9 @@ torch.backends.cudnn.allow_tf32 = USE_TF32
 @pytest.mark.parametrize("original_mace", [True, False])
 @pytest.mark.parametrize("batch", [1, 32])
 def test_symmetric_contraction(dtype, layout, original_mace, batch):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available")
+
     mul = 64
     irreps_in = mul * cue.Irreps("O3", "0e + 1o + 2e")
     irreps_out = mul * cue.Irreps("O3", "0e + 1o")
@@ -103,6 +106,7 @@ def test_mace_compatibility():
         device=device,
         dtype=torch.float32,
         math_dtype=torch.float64,
+        use_fallback=not torch.cuda.is_available(),
     )
     n_sc.weight.data = from64(
         (2, 164 // mul, mul),
