@@ -91,6 +91,8 @@ class TensorProduct(torch.nn.Module):
         if not self.has_cuda:
             self.f = _tensor_product_fx(descriptor, device, math_dtype, True)
 
+        self.operands_dims = [ope.size for ope in descriptor.operands]
+
     @torch.jit.ignore
     def __repr__(self):
         has_cuda_kernel = (
@@ -113,8 +115,28 @@ class TensorProduct(torch.nn.Module):
                 The output tensor resulting from the tensor product.
                 It has a shape of (batch, last_operand_size), where
                 `last_operand_size` is the size of the last operand in the descriptor.
-
         """
+        if (
+            not torch.jit.is_scripting()
+            and not torch.jit.is_tracing()
+            and not torch.compiler.is_compiling()
+        ):
+            if not isinstance(inputs, (list, tuple)):
+                raise ValueError("inputs should be a list of tensors")
+            if len(inputs) != self.num_operands - 1:
+                raise ValueError(
+                    f"Expected {self.num_operands - 1} input tensors, got {len(inputs)}"
+                )
+            for oid, input in enumerate(inputs):
+                torch._assert(
+                    input.ndim == 2,
+                    f"input {oid} should have ndim=2",
+                )
+                torch._assert(
+                    input.shape[1] == self.operands_dims[oid],
+                    f"input {oid} should have shape (batch, {self.operands_dims[oid]}), got {input.shape}",
+                )
+
         return self.f(inputs)
 
 
@@ -356,7 +378,11 @@ class _Wrapper(torch.nn.Module):
         self.descriptor = descriptor
 
     def forward(self, args: List[torch.Tensor]):
-        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
+        if (
+            not torch.jit.is_scripting()
+            and not torch.jit.is_tracing()
+            and not torch.compiler.is_compiling()
+        ):
             for oid, arg in enumerate(args):
                 torch._assert(
                     arg.ndim == 2,
@@ -488,7 +514,11 @@ class FusedTensorProductOp3(torch.nn.Module):
     def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1 = self._perm(inputs[0], inputs[1])
 
-        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
+        if (
+            not torch.jit.is_scripting()
+            and not torch.jit.is_tracing()
+            and not torch.compiler.is_compiling()
+        ):
             logger.debug(
                 f"Calling FusedTensorProductOp3: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
@@ -549,7 +579,11 @@ class FusedTensorProductOp4(torch.nn.Module):
     def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1, x2 = self._perm(inputs[0], inputs[1], inputs[2])
 
-        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
+        if (
+            not torch.jit.is_scripting()
+            and not torch.jit.is_tracing()
+            and not torch.compiler.is_compiling()
+        ):
             logger.debug(
                 f"Calling FusedTensorProductOp4: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
@@ -608,7 +642,11 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
     def forward(self, inputs: List[torch.Tensor]) -> torch.Tensor:
         x0, x1 = inputs
 
-        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
+        if (
+            not torch.jit.is_scripting()
+            and not torch.jit.is_tracing()
+            and not torch.compiler.is_compiling()
+        ):
             logger.debug(
                 f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
             )
@@ -629,7 +667,11 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
     def forward(self, inputs: List[torch.Tensor]):
         x0, x1, x2 = inputs
 
-        if not torch.jit.is_scripting() and not torch.compiler.is_compiling():
+        if (
+            not torch.jit.is_scripting()
+            and not torch.jit.is_tracing()
+            and not torch.compiler.is_compiling()
+        ):
             logger.debug(
                 f"Calling TensorProductUniform4x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}, {x2.shape}"
             )
