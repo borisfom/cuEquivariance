@@ -111,12 +111,13 @@ class TensorProduct(torch.nn.Module):
         x3: Optional[torch.Tensor] = None,
         x4: Optional[torch.Tensor] = None,
         x5: Optional[torch.Tensor] = None,
+        x6: Optional[torch.Tensor] = None,
     ):
         r"""
         Perform the tensor product based on the specified descriptor.
 
         Args:
-            x0, x1[, x2, x3, x4, x5]: The input tensors. The number of input tensors should match the number of operands in the descriptor minus one.
+            x0, x1[, x2, x3, x4, x5, x6]: The input tensors. The number of input tensors should match the number of operands in the descriptor minus one.
                 Each input tensor should have a shape of (batch, operand_size) or (1, operand_size)
                 where `operand_size` corresponds to the size of each operand as defined in
                 the tensor product descriptor.
@@ -129,6 +130,15 @@ class TensorProduct(torch.nn.Module):
         """
 
         if (
+            x6 is not None
+            and x5 is not None
+            and x4 is not None
+            and x3 is not None
+            and x2 is not None
+            and x1 is not None
+        ):
+            inputs = [x0, x1, x2, x3, x4, x5, x6]
+        elif (
             x5 is not None
             and x4 is not None
             and x3 is not None

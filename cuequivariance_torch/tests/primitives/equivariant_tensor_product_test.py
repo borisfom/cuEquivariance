@@ -48,9 +48,11 @@ def make_descriptors():
     )
 
     # These ETPs will trigger the symmetricContraction kernel
-    yield descriptors.spherical_harmonics(cue.SO3(1), [1, 2, 3])
+    yield descriptors.spherical_harmonics(cue.SO3(1), [0, 1, 2, 3, 4, 5])
     yield descriptors.symmetric_contraction(
-        cue.Irreps("O3", "32x0e + 32x1o"), cue.Irreps("O3", "32x0e + 32x1o"), [1, 2, 3]
+        cue.Irreps("O3", "32x0e + 32x1o"),
+        cue.Irreps("O3", "32x0e + 32x1o"),
+        [0, 1, 2, 3],
     )
 
 
@@ -77,20 +79,11 @@ def test_performance_cuda_vs_fx(
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
-    m = cuet.EquivariantTensorProduct(
-        e,
-        layout=cue.ir_mul,
-        device=device,
-        math_dtype=math_dtype,
-        use_fallback=False,
+    m_custom = cuet.EquivariantTensorProduct(
+        e, layout=cue.ir_mul, device=device, math_dtype=math_dtype, use_fallback=False
     )
-
-    m1 = cuet.EquivariantTensorProduct(
-        e,
-        layout=cue.ir_mul,
-        device=device,
-        math_dtype=math_dtype,
-        use_fallback=True,
+    m_fallback = cuet.EquivariantTensorProduct(
+        e, layout=cue.ir_mul, device=device, math_dtype=math_dtype, use_fallback=True
     )
 
     inputs = [
@@ -98,22 +91,12 @@ def test_performance_cuda_vs_fx(
     ]
 
     for _ in range(10):
-        m(*inputs)
-        m1(*inputs)
+        m_custom(*inputs)
+        m_fallback(*inputs)
     torch.cuda.synchronize()
 
-    def f():
-        ret = m(*inputs)
-        ret = torch.sum(ret)
-        return ret
-
-    def f1():
-        ret = m1(*inputs)
-        ret = torch.sum(ret)
-        return ret
-
-    t0 = timeit.Timer(f).timeit(number=10)
-    t1 = timeit.Timer(f1).timeit(number=10)
+    t0 = timeit.Timer(lambda: torch.sum(m_custom(*inputs))).timeit(number=10)
+    t1 = timeit.Timer(lambda: torch.sum(m_fallback(*inputs))).timeit(number=10)
     assert t0 < t1
 
 

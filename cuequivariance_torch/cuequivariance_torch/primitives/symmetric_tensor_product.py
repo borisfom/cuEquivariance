@@ -356,7 +356,13 @@ class FallbackImpl(torch.nn.Module):
         outs: List[torch.Tensor] = []
 
         for f in self.fs:
-            if f.num_operands == 5:
+            if f.num_operands == 8:
+                outs.append(f(x0[i0], x1, x1, x1, x1, x1, x1))
+            elif f.num_operands == 7:
+                outs.append(f(x0[i0], x1, x1, x1, x1, x1))
+            elif f.num_operands == 6:
+                outs.append(f(x0[i0], x1, x1, x1, x1))
+            elif f.num_operands == 5:
                 outs.append(f(x0[i0], x1, x1, x1))
             elif f.num_operands == 4:
                 outs.append(f(x0[i0], x1, x1))
