@@ -98,17 +98,17 @@ def test_performance_cuda_vs_fx(
     ]
 
     for _ in range(10):
-        m(inputs)
-        m1(inputs)
+        m(*inputs)
+        m1(*inputs)
     torch.cuda.synchronize()
 
     def f():
-        ret = m(inputs)
+        ret = m(*inputs)
         ret = torch.sum(ret)
         return ret
 
     def f1():
-        ret = m1(inputs)
+        ret = m1(*inputs)
         ret = torch.sum(ret)
         return ret
 
@@ -148,7 +148,7 @@ def test_precision_cuda_vs_fx(
     m = cuet.EquivariantTensorProduct(
         e, layout=cue.ir_mul, device=device, math_dtype=math_dtype, use_fallback=False
     )
-    y0 = m(inputs)
+    y0 = m(*inputs)
 
     m = cuet.EquivariantTensorProduct(
         e,
@@ -158,7 +158,7 @@ def test_precision_cuda_vs_fx(
         use_fallback=True,
     )
     inputs = [x.to(torch.float64) for x in inputs]
-    y1 = m(inputs).to(dtype)
+    y1 = m(*inputs).to(dtype)
 
     torch.testing.assert_close(y0, y1, atol=atol, rtol=rtol)
 
@@ -191,10 +191,14 @@ def test_export(
         use_fallback=use_fallback,
         device=device,
     )
-    inputs = [
-        torch.randn((512, inp.dim), device=device, dtype=dtype) for inp in e.inputs
+    exp_inputs = [
+        torch.randn((512, inp.irreps.dim), device=device, dtype=dtype)
+        for inp in e.inputs
     ]
-    res = m(inputs)
-    m = module_with_mode(mode, m, [inputs], math_dtype, tmp_path)
-    res_script = m(inputs)
+    inputs = [
+        torch.randn((1024, inp.dim), device=device, dtype=dtype) for inp in e.inputs
+    ]
+    res = m(*inputs)
+    m = module_with_mode(mode, m, exp_inputs, math_dtype, tmp_path)
+    res_script = m(*inputs)
     torch.testing.assert_close(res, res_script, atol=atol, rtol=rtol)

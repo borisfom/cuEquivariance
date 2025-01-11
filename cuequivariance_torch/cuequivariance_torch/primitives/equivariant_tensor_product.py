@@ -69,7 +69,7 @@ TRANSPOSE_DISPATCHERS = [
 ]
 
 
-class TPDispatcher(Dispatcher):
+class TPDispatcher(cuet._Wrapper):
     def forward(
         self,
         inputs: List[torch.Tensor],
@@ -77,9 +77,8 @@ class TPDispatcher(Dispatcher):
     ) -> torch.Tensor:
         if indices is not None:
             # TODO: at some point we will have kernel for this
-            assert len(inputs) >= 1
             inputs[0] = inputs[0][indices]
-        return self.tp(inputs)
+        return self.module(inputs)
 
 
 class SymmetricTPDispatcher(Dispatcher):
@@ -229,14 +228,13 @@ class EquivariantTensorProduct(torch.nn.Module):
             else:
                 raise NotImplementedError("This should not happen")
         else:
-            self.tp = TPDispatcher(
-                cuet.TensorProduct(
-                    e.ds[0],
-                    device=device,
-                    math_dtype=math_dtype,
-                    use_fallback=use_fallback,
-                )
+            tp = cuet.TensorProduct(
+                e.ds[0],
+                device=device,
+                math_dtype=math_dtype,
+                use_fallback=use_fallback,
             )
+            self.tp = TPDispatcher(tp, tp.descriptor)
 
         self.operands_dims = [op.dim for op in e.operands]
 
@@ -245,12 +243,25 @@ class EquivariantTensorProduct(torch.nn.Module):
 
     def forward(
         self,
-        inputs: List[torch.Tensor],
+        x0: torch.Tensor,
+        x1: Optional[torch.Tensor] = None,
+        x2: Optional[torch.Tensor] = None,
+        x3: Optional[torch.Tensor] = None,
         indices: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         If ``indices`` is not None, the first input is indexed by ``indices``.
         """
+
+        if x3 is not None and x2 is not None and x1 is not None:
+            inputs = [x0, x1, x2, x3]
+        elif x2 is not None and x1 is not None:
+            inputs = [x0, x1, x2]
+        elif x1 is not None:
+            inputs = [x0, x1]
+        else:
+            inputs = [x0]
+
         if (
             not torch.jit.is_scripting()
             and not torch.jit.is_tracing()

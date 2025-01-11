@@ -60,10 +60,13 @@ def test_script_fused_tp_3(mode, tmp_path):
     x1 = torch.randn(batch, d.operands[1].size, device=device, dtype=torch.float32)
     inputs = [x0, x1]
     m = FusedTensorProductOp3(d, (0, 1), device, torch.float32)
-    module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
-    out1 = m(inputs)
-    out2 = module(inputs)
+    module = module_with_mode(mode, m, inputs, torch.float32, tmp_path)
+    out1 = m(*inputs)
+    out2 = module(*inputs)
     torch.testing.assert_close(out1, out2)
+
+
+export_modes = ["script", "export"]
 
 
 @pytest.mark.parametrize("mode", export_modes)
@@ -87,9 +90,9 @@ def test_script_fused_tp_4(mode, tmp_path):
 
     inputs = [x0, x1, x2]
     m = FusedTensorProductOp4(d, [0, 1, 2], device, torch.float32)
-    module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
-    out1 = m(inputs)
-    out2 = module(inputs)
+    module = module_with_mode(mode, m, inputs, torch.float32, tmp_path)
+    out1 = m(*inputs)
+    out2 = module(*inputs)
     torch.testing.assert_close(out1, out2)
 
 
@@ -112,9 +115,9 @@ def test_script_uniform_tp_3(mode, tmp_path):
     inputs = [x0, x1]
 
     m = TensorProductUniform3x1d(d, device, torch.float32)
-    module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
-    out1 = m(inputs)
-    out2 = module(inputs)
+    module = module_with_mode(mode, m, inputs, torch.float32, tmp_path)
+    out1 = m(*inputs)
+    out2 = module(*inputs)
     torch.testing.assert_close(out1, out2)
 
 
@@ -138,7 +141,7 @@ def test_script_uniform_tp_4(mode, tmp_path):
     inputs = [x0, x1, x2]
 
     m = TensorProductUniform4x1d(d, device, torch.float32)
-    module = module_with_mode(mode, m, (inputs,), torch.float32, tmp_path)
-    out1 = m(inputs)
-    out2 = module(inputs)
+    module = module_with_mode(mode, m, inputs, torch.float32, tmp_path)
+    out1 = m(*inputs)
+    out2 = module(*inputs)
     torch.testing.assert_close(out1, out2)

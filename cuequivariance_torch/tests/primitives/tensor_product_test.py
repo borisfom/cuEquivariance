@@ -89,6 +89,8 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
         (torch.bfloat16, torch.float32, 1.0),
     ]
 
+export_modes = ["script", "export", "onnx", "trt", "jit"]
+
 
 @pytest.mark.parametrize("d", make_descriptors())
 @pytest.mark.parametrize("dtype, math_dtype, tol", settings)
@@ -120,7 +122,7 @@ def test_primitive_tensor_product_cuda_vs_fx(
         use_fallback=use_fallback,
     )
 
-    out1 = m(inputs)
+    out1 = m(*inputs)
 
     m = cuet.TensorProduct(
         d,
@@ -130,7 +132,7 @@ def test_primitive_tensor_product_cuda_vs_fx(
     )
 
     inputs_ = [inp.to(torch.float64) for inp in inputs]
-    out2 = m(inputs_)
+    out2 = m(*inputs_)
 
     assert out1.shape[:-1] == (12,)
     assert out1.dtype == dtype
@@ -172,7 +174,7 @@ def test_export(d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path):
     module = cuet.TensorProduct(
         d, device=device, math_dtype=torch.float32, use_fallback=use_fallback
     )
-    out1 = module(inputs)
-    module = module_with_mode(mode, module, (inputs,), torch.float32, tmp_path)
-    out2 = module(inputs)
+    out1 = module(*inputs)
+    module = module_with_mode(mode, module, inputs, torch.float32, tmp_path)
+    out2 = module(*inputs)
     torch.testing.assert_close(out1, out2)
