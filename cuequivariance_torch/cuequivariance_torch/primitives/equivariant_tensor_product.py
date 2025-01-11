@@ -267,13 +267,9 @@ class EquivariantTensorProduct(torch.nn.Module):
             and not torch.jit.is_tracing()
             and not torch.compiler.is_compiling()
         ):
-            if not isinstance(inputs, (list, tuple)):
-                raise ValueError(
-                    "inputs should be a list of tensors followed by optional indices"
-                )
             if len(inputs) != self.etp.num_inputs:
                 raise ValueError(
-                    f"Expected {self.etp.num_inputs} inputs, got {len(inputs)}"
+                    f"Expected {self.etp.num_inputs} input tensors, got {len(inputs)}"
                 )
             for oid, input in enumerate(inputs):
                 torch._assert(
