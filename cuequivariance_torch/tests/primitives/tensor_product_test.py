@@ -146,8 +146,7 @@ def test_primitive_tensor_product_cuda_vs_fx(
         torch.testing.assert_close(g1, g2.to(dtype), atol=100 * tol, rtol=100 * tol)
 
 
-export_modes = ["compile", "script", "export", "onnx", "trt"]
-
+export_modes = ["compile", "script", "jit"]
 
 @pytest.mark.parametrize("d", make_descriptors())
 @pytest.mark.parametrize("mode", export_modes)

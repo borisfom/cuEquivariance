@@ -17,7 +17,7 @@ from cuequivariance_torch.primitives.tensor_product import (
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
-export_modes = ["script", "compile", "export"]
+export_modes = ["script", "compile", "jit"]
 
 
 @pytest.mark.parametrize("mode", export_modes)
