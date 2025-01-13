@@ -173,7 +173,7 @@ def test_export(d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path):
     )
     out1 = module(*inputs)
     out11 = module(*exp_inputs)
-    module = module_with_mode(mode, module, inputs, torch.float32, tmp_path)
+    module = module_with_mode(mode, module, exp_inputs, torch.float32, tmp_path)
     out2 = module(*inputs)
     out22 = module(*exp_inputs)
     torch.testing.assert_close(out1, out2)
