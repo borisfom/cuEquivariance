@@ -89,9 +89,6 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
         (torch.bfloat16, torch.float32, 1.0),
     ]
 
-export_modes = ["script", "export", "onnx", "trt", "jit"]
-
-
 @pytest.mark.parametrize("batch_size", [0, 3])
 @pytest.mark.parametrize("use_fallback", [True, False])
 @pytest.mark.parametrize("dtype, math_dtype, tol", settings)
@@ -148,7 +145,7 @@ def test_primitive_tensor_product_cuda_vs_fx(
         torch.testing.assert_close(g1, g2.to(dtype), atol=100 * tol, rtol=100 * tol)
 
 
-export_modes = ["compile", "script", "jit"]
+export_modes = ["compile", "script", "export", "onnx", "trt"]
 
 
 @pytest.mark.parametrize("d", make_descriptors())
@@ -158,6 +155,10 @@ def test_export(d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
+    exp_inputs = [
+        torch.randn(1, ope.size, device=device, dtype=torch.float32)
+        for ope in d.operands[:-1]
+    ]
     batch = 12
     inputs = [
         torch.randn(batch, ope.size, device=device, dtype=torch.float32)
@@ -171,6 +172,9 @@ def test_export(d: cue.SegmentedTensorProduct, mode, use_fallback, tmp_path):
         d, device=device, math_dtype=torch.float32, use_fallback=use_fallback
     )
     out1 = module(*inputs)
+    out11 = module(*exp_inputs)
     module = module_with_mode(mode, module, inputs, torch.float32, tmp_path)
     out2 = module(*inputs)
+    out22 = module(*exp_inputs)
     torch.testing.assert_close(out1, out2)
+    torch.testing.assert_close(out11, out22)
