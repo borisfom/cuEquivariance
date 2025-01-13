@@ -148,6 +148,7 @@ def test_primitive_tensor_product_cuda_vs_fx(
 
 export_modes = ["compile", "script", "jit"]
 
+
 @pytest.mark.parametrize("d", make_descriptors())
 @pytest.mark.parametrize("mode", export_modes)
 @pytest.mark.parametrize("use_fallback", [True, False])
