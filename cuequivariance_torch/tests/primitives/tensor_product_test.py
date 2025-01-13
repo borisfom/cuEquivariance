@@ -89,6 +89,7 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
         (torch.bfloat16, torch.float32, 1.0),
     ]
 
+
 @pytest.mark.parametrize("batch_size", [0, 3])
 @pytest.mark.parametrize("use_fallback", [True, False])
 @pytest.mark.parametrize("dtype, math_dtype, tol", settings)
