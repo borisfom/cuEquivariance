@@ -102,8 +102,10 @@ def test_script_fused_tp_4(mode, tmp_path):
     out1 = module(*inputs)
     out11 = module(*exp_inputs)
     module = module_with_mode(mode, module, exp_inputs, torch.float32, tmp_path)
+
     out2 = module(*inputs)
     out22 = module(*exp_inputs)
+
     torch.testing.assert_close(out1, out2)
     torch.testing.assert_close(out11, out22)
 
