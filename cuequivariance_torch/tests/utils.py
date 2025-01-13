@@ -123,7 +123,7 @@ def module_with_mode(
             pytest.skip("ONNX not available!")
         if dtype == torch.float64 or math_dtype == torch.float64:
             pytest.skip("TRT/ORT do not support float64")
-
+    torch._dynamo.reset()
     with torch.set_grad_enabled(mode in grad_modes):
         if mode == "compile":
             module = torch.compile(module, fullgraph=True)
