@@ -25,16 +25,21 @@ import cuequivariance_torch as cuet
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
 
-def make_descriptors():
+def make_descriptors(shared_op0=False):
     # This ETP will trigger the fusedTP kernel
-    yield cue.descriptors.fully_connected_tensor_product(
+    e = cue.descriptors.fully_connected_tensor_product(
         cue.Irreps("O3", "32x0e + 32x1o"),
         cue.Irreps("O3", "0e + 1o + 2e"),
         cue.Irreps("O3", "32x0e + 32x1o"),
     ).flatten_coefficient_modes()
+    if shared_op0:
+        yield e, False
+        yield e, True
+    else:
+        yield e
 
     # This ETP will trigger the uniform1dx4 kernel
-    yield (
+    e = (
         cue.descriptors.channelwise_tensor_product(
             cue.Irreps("O3", "32x0e + 32x1o"),
             cue.Irreps("O3", "0e + 1o + 2e"),
@@ -43,14 +48,29 @@ def make_descriptors():
         .flatten_coefficient_modes()
         .squeeze_modes()
     )
+    if shared_op0:
+        yield e, False
+        yield e, True
+    else:
+        yield e
 
     # These ETPs will trigger the symmetricContraction kernel
-    yield cue.descriptors.spherical_harmonics(cue.SO3(1), [0, 1, 2, 3])
-    yield cue.descriptors.symmetric_contraction(
+    e = cue.descriptors.spherical_harmonics(cue.SO3(1), [0, 1, 2, 3])
+    if shared_op0:
+        yield e, False
+    else:
+        yield e
+
+    e = cue.descriptors.symmetric_contraction(
         cue.Irreps("O3", "32x0e + 32x1o"),
         cue.Irreps("O3", "32x0e + 32x1o"),
         [0, 1, 2, 3],
     )
+    if shared_op0:
+        yield e, False
+        yield e, True
+    else:
+        yield e
 
 
 settings1 = [
@@ -112,9 +132,10 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
 
 @pytest.mark.parametrize("batch_size", [0, 5])
 @pytest.mark.parametrize("dtype, math_dtype, atol, rtol", settings2)
-@pytest.mark.parametrize("e", make_descriptors())
+@pytest.mark.parametrize("e, shared_op0", make_descriptors(True))
 def test_precision_cuda_vs_fx(
     e: cue.EquivariantTensorProduct,
+    shared_op0: bool,
     dtype: torch.dtype,
     math_dtype: torch.dtype,
     atol: float,
@@ -125,8 +146,12 @@ def test_precision_cuda_vs_fx(
         pytest.skip("CUDA is not available")
 
     inputs = [
-        torch.randn((batch_size, inp.dim), device=device, dtype=dtype)
-        for inp in e.inputs
+        torch.randn(
+            (1 if shared_op0 and i == 0 else batch_size, inp.dim),
+            device=device,
+            dtype=dtype,
+        )
+        for i, inp in enumerate(e.inputs)
     ]
     m = cuet.EquivariantTensorProduct(
         e, layout=cue.ir_mul, device=device, math_dtype=math_dtype, use_fallback=False
