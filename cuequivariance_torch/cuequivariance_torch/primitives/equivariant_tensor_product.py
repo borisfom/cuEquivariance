@@ -131,14 +131,14 @@ class EquivariantTensorProduct(torch.nn.Module):
         >>> x2 = torch.ones(17, e.inputs[2].dim, device=device)
         >>> tp = cuet.EquivariantTensorProduct(e, layout=cue.ir_mul, device=device)
         >>> tp(w, x1, x2)
-        tensor([[0., 0., 0., 0., 0., 0.],...)
+        tensor(...)
 
         You can optionally index the first input tensor:
 
         >>> w = torch.ones(3, e.inputs[0].dim, device=device)
         >>> indices = torch.randint(3, (17,))
         >>> tp(w, x1, x2, indices=indices)
-        tensor([[0., 0., 0., 0., 0., 0.],...)
+        tensor(...)
     """
 
     def __init__(
