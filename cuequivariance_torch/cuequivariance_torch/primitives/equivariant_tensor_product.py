@@ -69,44 +69,50 @@ TRANSPOSE_DISPATCHERS = [
 ]
 
 
+# [Mario] I'm not sure how to handle this case
 class TPDispatcher(cuet._Wrapper):
     def forward(
         self,
         inputs: List[torch.Tensor],
-        indices: Optional[torch.Tensor] = None,
-        **kwargs,
+        indices: List[Optional[torch.Tensor]],
+        num_outputs: Optional[int] = None,
     ) -> torch.Tensor:
-        if indices is not None:
-            # TODO: at some point we will have kernel for this
-            inputs[0] = inputs[0][indices]
-        return self.module(inputs, **kwargs)
+        return self.module(inputs, indices, num_outputs)
 
 
 class SymmetricTPDispatcher(Dispatcher):
     def forward(
         self,
         inputs: List[torch.Tensor],
-        indices: Optional[torch.Tensor] = None,
+        indices: List[Optional[torch.Tensor]],
+        num_outputs: Optional[int] = None,
     ) -> torch.Tensor:
-        assert indices is None
-        return self.tp(inputs[0])
+        (x0,) = inputs
+        assert indices[0] is None
+        assert indices[1] is None
+        assert num_outputs is None
+        return self.tp(x0)
 
 
 class IWeightedSymmetricTPDispatcher(Dispatcher):
     def forward(
         self,
         inputs: List[torch.Tensor],
-        indices: Optional[torch.Tensor] = None,
+        indices: List[Optional[torch.Tensor]],
+        num_outputs: Optional[int] = None,
     ) -> torch.Tensor:
         x0, x1 = inputs
-        if indices is None:
+        if indices[0] is None:
             torch._assert(
                 x0.ndim == 2,
                 f"Expected x0 to have shape (batch, dim), got {x0.shape}",
             )
-            indices = torch.arange(x1.shape[0], dtype=torch.int32, device=x1.device)
-            indices = indices % x0.shape[0]
-        return self.tp(x0, indices, x1)
+            indices[0] = torch.arange(x1.shape[0], dtype=torch.int32, device=x1.device)
+            indices[0] = indices[0] % x0.shape[0]
+        assert indices[1] is None
+        assert indices[2] is None
+        assert num_outputs is None
+        return self.tp(x0, indices[0], x1)
 
 
 class EquivariantTensorProduct(torch.nn.Module):
