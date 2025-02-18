@@ -251,8 +251,12 @@ class EquivariantTensorProduct(torch.nn.Module):
         x1: Optional[torch.Tensor] = None,
         x2: Optional[torch.Tensor] = None,
         x3: Optional[torch.Tensor] = None,
-        indices: Optional[torch.Tensor] = None,
-        **kwargs,
+        idx0: Optional[torch.Tensor] = None,
+        idx1: Optional[torch.Tensor] = None,
+        idx2: Optional[torch.Tensor] = None,
+        idx3: Optional[torch.Tensor] = None,
+        idx_out: Optional[torch.Tensor] = None,
+        num_outputs: Optional[int] = None,
     ) -> torch.Tensor:
         """
         If ``indices`` is not None, the first input is indexed by ``indices``.
@@ -260,12 +264,16 @@ class EquivariantTensorProduct(torch.nn.Module):
 
         if x3 is not None and x2 is not None and x1 is not None:
             inputs = [x0, x1, x2, x3]
+            indices = [idx0, idx1, idx2, idx3, idx_out]
         elif x2 is not None and x1 is not None:
             inputs = [x0, x1, x2]
+            indices = [idx0, idx1, idx2, idx_out]
         elif x1 is not None:
             inputs = [x0, x1]
+            indices = [idx0, idx1, idx_out]
         else:
             inputs = [x0]
+            indices = [idx0, idx_out]
 
         if (
             not torch.jit.is_scripting()
@@ -290,7 +298,7 @@ class EquivariantTensorProduct(torch.nn.Module):
         inputs = self.transpose_in(inputs)
 
         # Compute tensor product
-        output = self.tp(inputs, indices, **kwargs)
+        output = self.tp(inputs, indices, num_outputs)
 
         # Transpose output
         output = self.transpose_out(output)
