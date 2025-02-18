@@ -61,6 +61,7 @@ class TensorProduct(torch.nn.Module):
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
         use_fallback: Optional[bool] = None,
+        indexed: Optional[bool] = False,
     ):
         super().__init__()
         self.descriptor = descriptor
@@ -72,11 +73,11 @@ class TensorProduct(torch.nn.Module):
         self.num_operands = descriptor.num_operands
 
         if use_fallback is False:
-            self.f = _tensor_product_cuda(descriptor, device, math_dtype)
+            self.f = _tensor_product_cuda(descriptor, device, math_dtype, indexed)
             self.has_cuda = True
         elif use_fallback is None:
             try:
-                self.f = _tensor_product_cuda(descriptor, device, math_dtype)
+                self.f = _tensor_product_cuda(descriptor, device, math_dtype, indexed)
                 self.has_cuda = True
             except NotImplementedError as e:
                 logger.info(f"CUDA implementation not available: {e}")
@@ -112,6 +113,7 @@ class TensorProduct(torch.nn.Module):
         x4: Optional[torch.Tensor] = None,
         x5: Optional[torch.Tensor] = None,
         x6: Optional[torch.Tensor] = None,
+        **kwargs,
     ):
         r"""
         Perform the tensor product based on the specified descriptor.
@@ -176,7 +178,7 @@ class TensorProduct(torch.nn.Module):
                     f"input {oid} should have shape (batch, {self.operands_dims[oid]}), got {input.shape}",
                 )
 
-        return self.f(inputs)
+        return self.f(inputs, **kwargs)
 
 
 def to_notypeconv(t, *args, **kwargs):
@@ -356,44 +358,44 @@ class _Caller(torch.nn.Module):
 
 
 class _NoArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor]):
-        return self.module()
+    def forward(self, args: List[torch.Tensor], **kwargs):
+        return self.module(**kwargs)
 
 
 class _OneArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor]):
-        return self.module(args[0])
+    def forward(self, args: List[torch.Tensor], **kwargs):
+        return self.module(args[0], **kwargs)
 
 
 class _TwoArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor]):
-        return self.module(args[0], args[1])
+    def forward(self, args: List[torch.Tensor], **kwargs):
+        return self.module(args[0], args[1], **kwargs)
 
 
 class _ThreeArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor]):
-        return self.module(args[0], args[1], args[2])
+    def forward(self, args: List[torch.Tensor], **kwargs):
+        return self.module(args[0], args[1], args[2], **kwargs)
 
 
 class _FourArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor]):
-        return self.module(args[0], args[1], args[2], args[3])
+    def forward(self, args: List[torch.Tensor], **kwargs):
+        return self.module(args[0], args[1], args[2], args[3], **kwargs)
 
 
 class _FiveArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor]):
-        return self.module(args[0], args[1], args[2], args[3], args[4])
+    def forward(self, args: List[torch.Tensor], **kwargs):
+        return self.module(args[0], args[1], args[2], args[3], args[4], **kwargs)
 
 
 class _SixArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor]):
-        return self.module(args[0], args[1], args[2], args[3], args[4], args[5])
+    def forward(self, args: List[torch.Tensor], **kwargs):
+        return self.module(args[0], args[1], args[2], args[3], args[4], args[5], **kwargs)
 
 
 class _SevenArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor]):
+    def forward(self, args: List[torch.Tensor], **kwargs):
         return self.module(
-            args[0], args[1], args[2], args[3], args[4], args[5], args[6]
+            args[0], args[1], args[2], args[3], args[4], args[5], args[6], **kwargs
         )
 
 
@@ -415,14 +417,15 @@ class _Wrapper(torch.nn.Module):
         self.module = CALL_DISPATCHERS[descriptor.num_operands - 1](module)
         self.descriptor = descriptor
 
-    def forward(self, args: List[torch.Tensor]):
-        return self.module(args)
+    def forward(self, args: List[torch.Tensor], **kwargs):
+        return self.module(args, **kwargs)
 
 
 def _tensor_product_cuda(
     descriptor: stp.SegmentedTensorProduct,
     device: Optional[torch.device],
     math_dtype: torch.dtype,
+    indexed=False,
 ) -> torch.nn.Module:
     logger.debug(f"Starting search for a cuda kernel for {descriptor}")
 
@@ -460,9 +463,16 @@ def _tensor_product_cuda(
                 operand_num_segments=[o.num_segments for o in d.operands],
             ):
                 if descriptor.num_operands == 3:
+                    if indexed:
+                        return TensorProductUniform3x1dIndexed(d, device, math_dtype)
                     return TensorProductUniform3x1d(d, device, math_dtype)
                 else:
+                    if indexed:
+                        return TensorProductUniform4x1dIndexed(d, device, math_dtype)
                     return TensorProductUniform4x1d(d, device, math_dtype)
+
+    if indexed:
+        raise NotImplementedError(f"No cuda kernel found for {descriptor} with indexed inputs.")
 
     supported_targets = [
         stp.Subscripts(subscripts)
@@ -657,7 +667,7 @@ class TensorProductUniform3x1d(TensorProductUniform1d):
         # ops.TensorProductUniform1d expects inputs
         # of shape (Z, dim) or (1, dim)
         return self._f(x0, x1)
-
+    
 
 class TensorProductUniform4x1d(TensorProductUniform1d):
     @torch.jit.ignore
@@ -682,6 +692,100 @@ class TensorProductUniform4x1d(TensorProductUniform1d):
         # ops.TensorProductUniform1d expects inputs
         # of shape (Z, dim) or (1, dim)
         return self._f(x0, x1, x2)
+    
+    
+class TensorProductUniform3x1dIndexed(torch.nn.Module):
+    def __init__(
+        self,
+        descriptor: stp.SegmentedTensorProduct,
+        device: Optional[torch.device],
+        math_dtype: torch.dtype,
+    ):
+        super().__init__()
+        import cuequivariance_ops_torch as ops
+
+        self.descriptor = descriptor
+
+        assert len(descriptor.subscripts.modes()) == 1
+        assert descriptor.all_same_segment_shape()
+        assert descriptor.coefficient_subscripts == ""
+        u = next(iter(descriptor.get_dims(descriptor.subscripts.modes()[0])))
+
+        self._f = ops.TensorProductUniform3x1dIndexed(
+            operand_dim=[ope.ndim for ope in descriptor.operands],
+            operand_extent=u,
+            operand_num_segments=[ope.num_segments for ope in descriptor.operands],
+            path_indices=[path.indices for path in descriptor.paths],
+            path_coefficients=[float(path.coefficients) for path in descriptor.paths],
+            math_dtype=math_dtype,
+        ).to(device=device)
+
+    @torch.jit.ignore
+    def __repr__(self):
+        return f"TensorProductUniform3x1dIndexed({self.descriptor} (output last operand))"
+
+    def forward(self, x0: torch.Tensor, x1: torch.Tensor, op_idx0: Optional[torch.Tensor], op_idx1: Optional[torch.Tensor], op_idx_out: Optional[torch.Tensor], num_output_rows: int) -> torch.Tensor:
+        if (
+            not torch.jit.is_scripting()
+            and not torch.jit.is_tracing()
+            and not torch.compiler.is_compiling()
+        ):
+            logger.debug(
+                f"Calling TensorProductUniform3x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
+            )
+        torch._assert(x0.ndim == 2, "input should be (batch, dim) or (1, dim)")
+        torch._assert(x1.ndim == 2, "input should be (batch, dim) or (1, dim)")
+
+        # ops.TensorProductUniform1d expects inputs
+        # of shape (Z, dim) or (1, dim)
+        return self._f(x0, x1, op_idx0, op_idx1, op_idx_out, num_output_rows)
+
+
+class TensorProductUniform4x1dIndexed(torch.nn.Module):
+    def __init__(
+        self,
+        descriptor: stp.SegmentedTensorProduct,
+        device: Optional[torch.device],
+        math_dtype: torch.dtype,
+    ):
+        super().__init__()
+        import cuequivariance_ops_torch as ops
+
+        self.descriptor = descriptor
+
+        assert len(descriptor.subscripts.modes()) == 1
+        assert descriptor.all_same_segment_shape()
+        assert descriptor.coefficient_subscripts == ""
+        u = next(iter(descriptor.get_dims(descriptor.subscripts.modes()[0])))
+
+        self._f = ops.TensorProductUniform4x1dIndexed(
+            operand_dim=[ope.ndim for ope in descriptor.operands],
+            operand_extent=u,
+            operand_num_segments=[ope.num_segments for ope in descriptor.operands],
+            path_indices=[path.indices for path in descriptor.paths],
+            path_coefficients=[float(path.coefficients) for path in descriptor.paths],
+            math_dtype=math_dtype,
+        ).to(device=device)
+
+    @torch.jit.ignore
+    def __repr__(self):
+        return f"TensorProductUniform4x1dIndexed({self.descriptor} (output last operand))"
+
+    def forward(self, x0: torch.Tensor, x1: torch.Tensor, x2: torch.Tensor, op_idx0: Optional[torch.Tensor], op_idx1: Optional[torch.Tensor], op_idx2: Optional[torch.Tensor], op_idx_out: Optional[torch.Tensor], num_output_rows) -> torch.Tensor:
+        if (
+            not torch.jit.is_scripting()
+            and not torch.jit.is_tracing()
+            and not torch.compiler.is_compiling()
+        ):
+            logger.debug(
+                f"Calling TensorProductUniform4x1d: {self.descriptor}, input shapes: {x0.shape}, {x1.shape}"
+            )
+        torch._assert(x0.ndim == 2, "input should be (batch, dim) or (1, dim)")
+        torch._assert(x1.ndim == 2, "input should be (batch, dim) or (1, dim)")
+
+        # ops.TensorProductUniform1d expects inputs
+        # of shape (Z, dim) or (1, dim)
+        return self._f(x0, x1, x2, op_idx0, op_idx1, op_idx2, op_idx_out, num_output_rows)
 
 
 def _permutation_module(permutation: Tuple[int, ...]):

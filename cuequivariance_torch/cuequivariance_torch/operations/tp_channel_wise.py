@@ -58,6 +58,7 @@ class ChannelWiseTensorProduct(torch.nn.Module):
         dtype: Optional[torch.dtype] = None,
         math_dtype: Optional[torch.dtype] = None,
         use_fallback: Optional[bool] = None,
+        indexed: Optional[bool] = False,
     ):
         super().__init__()
         irreps_in1, irreps_in2 = default_irreps(irreps_in1, irreps_in2)
@@ -99,6 +100,7 @@ class ChannelWiseTensorProduct(torch.nn.Module):
             device=device,
             math_dtype=math_dtype,
             use_fallback=use_fallback,
+            indexed=indexed,
         )
 
     @torch.jit.ignore
@@ -114,6 +116,7 @@ class ChannelWiseTensorProduct(torch.nn.Module):
         x1: torch.Tensor,
         x2: torch.Tensor,
         weight: Optional[torch.Tensor] = None,
+        **kwargs,
     ) -> torch.Tensor:
         """
         Perform the forward pass of the fully connected tensor product operation.
@@ -139,11 +142,11 @@ class ChannelWiseTensorProduct(torch.nn.Module):
             if weight is not None:
                 raise ValueError("Internal weights are used, weight should be None")
             else:
-                return self.f(self.weight, x1, x2)
+                return self.f(self.weight, x1, x2, **kwargs)
         else:
             if weight is None:
                 raise ValueError(
                     "Internal weights are not used, weight should not be None"
                 )
             else:
-                return self.f(weight, x1, x2)
+                return self.f(weight, x1, x2, **kwargs)

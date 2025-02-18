@@ -74,11 +74,12 @@ class TPDispatcher(cuet._Wrapper):
         self,
         inputs: List[torch.Tensor],
         indices: Optional[torch.Tensor] = None,
+        **kwargs,
     ) -> torch.Tensor:
         if indices is not None:
             # TODO: at some point we will have kernel for this
             inputs[0] = inputs[0][indices]
-        return self.module(inputs)
+        return self.module(inputs, **kwargs)
 
 
 class SymmetricTPDispatcher(Dispatcher):
@@ -154,6 +155,7 @@ class EquivariantTensorProduct(torch.nn.Module):
         device: Optional[torch.device] = None,
         math_dtype: Optional[torch.dtype] = None,
         use_fallback: Optional[bool] = None,
+        indexed: Optional[bool] = False,
     ):
         super().__init__()
         if not isinstance(layout_in, tuple):
@@ -234,6 +236,7 @@ class EquivariantTensorProduct(torch.nn.Module):
                 device=device,
                 math_dtype=math_dtype,
                 use_fallback=use_fallback,
+                indexed=indexed,
             )
             self.tp = TPDispatcher(tp, tp.descriptor)
 
@@ -249,6 +252,7 @@ class EquivariantTensorProduct(torch.nn.Module):
         x2: Optional[torch.Tensor] = None,
         x3: Optional[torch.Tensor] = None,
         indices: Optional[torch.Tensor] = None,
+        **kwargs,
     ) -> torch.Tensor:
         """
         If ``indices`` is not None, the first input is indexed by ``indices``.
@@ -286,7 +290,7 @@ class EquivariantTensorProduct(torch.nn.Module):
         inputs = self.transpose_in(inputs)
 
         # Compute tensor product
-        output = self.tp(inputs, indices)
+        output = self.tp(inputs, indices, **kwargs)
 
         # Transpose output
         output = self.transpose_out(output)
