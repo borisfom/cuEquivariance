@@ -18,7 +18,10 @@ import torch
 
 import cuequivariance as cue
 import cuequivariance_torch as cuet
+from cuequivariance import segmented_tensor_product as stp
 from cuequivariance.irreps_array.misc_ui import default_layout
+
+from .tensor_product import CALL_DISPATCHERS
 
 
 class Dispatcher(torch.nn.Module):
@@ -69,8 +72,12 @@ TRANSPOSE_DISPATCHERS = [
 ]
 
 
-# borisf: do we always have indexed TP as a module here or do we need another dispatch level? 
-class TPDispatcher(cuet._Wrapper):
+class IndexedTPDispatcher(cuet._Wrapper):
+    def __init__(self, module: torch.nn.Module, descriptor: stp.SegmentedTensorProduct):
+        super().__init__()
+        self.module = CALL_DISPATCHERS[descriptor.num_operands - 1 + 2](module)
+        self.descriptor = descriptor
+
     def forward(
         self,
         inputs: List[torch.Tensor],
@@ -78,6 +85,18 @@ class TPDispatcher(cuet._Wrapper):
         num_outputs: Optional[int] = None,
     ) -> torch.Tensor:
         return self.module(inputs, indices, num_outputs)
+
+
+class TPDispatcher(cuet._Wrapper):
+    def forward(
+        self,
+        inputs: List[torch.Tensor],
+        indices: Optional[List[torch.Tensor]] = None,
+        num_outputs: Optional[int] = None,
+    ) -> torch.Tensor:
+        assert indices is None
+        assert num_outputs is None
+        return self.module(inputs)
 
 
 class SymmetricTPDispatcher(Dispatcher):
@@ -106,7 +125,10 @@ class IWeightedSymmetricTPDispatcher(Dispatcher):
                 x0.ndim == 2,
                 f"Expected x0 to have shape (batch, dim), got {x0.shape}",
             )
-            indices = [ torch.arange(x1.shape[0], dtype=torch.int32, device=x1.device) % x0.shape[0] ] 
+            indices = [
+                torch.arange(x1.shape[0], dtype=torch.int32, device=x1.device)
+                % x0.shape[0]
+            ]
         assert num_outputs is None
         return self.tp(x0, indices[0], x1)
 
@@ -145,6 +167,7 @@ class EquivariantTensorProduct(torch.nn.Module):
         tensor([[0., 0., 0., 0., 0., 0.],...)
     """
 
+    @torch.jit.ignore
     def __init__(
         self,
         e: cue.EquivariantTensorProduct,
@@ -240,7 +263,10 @@ class EquivariantTensorProduct(torch.nn.Module):
                 use_fallback=use_fallback,
                 indexed=indexed,
             )
-            self.tp = TPDispatcher(tp, tp.descriptor)
+            if indexed:
+                self.tp = IndexedTPDispatcher(tp, tp.descriptor)
+            else:
+                self.tp = TPDispatcher(tp, tp.descriptor)
 
         self.operands_dims = [op.dim for op in e.operands]
 
