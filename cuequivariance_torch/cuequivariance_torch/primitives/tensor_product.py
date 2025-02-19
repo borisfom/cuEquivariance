@@ -113,7 +113,6 @@ class TensorProduct(torch.nn.Module):
         x4: Optional[torch.Tensor] = None,
         x5: Optional[torch.Tensor] = None,
         x6: Optional[torch.Tensor] = None,
-        **kwargs,
     ):
         r"""
         Perform the tensor product based on the specified descriptor.
@@ -178,7 +177,7 @@ class TensorProduct(torch.nn.Module):
                     f"input {oid} should have shape (batch, {self.operands_dims[oid]}), got {input.shape}",
                 )
 
-        return self.f(inputs, **kwargs)
+        return self.f(inputs)
 
 
 def to_notypeconv(t, *args, **kwargs):
@@ -358,44 +357,44 @@ class _Caller(torch.nn.Module):
 
 
 class _NoArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor], **kwargs):
-        return self.module(**kwargs)
+    def forward(self, args: List[torch.Tensor]):
+        return self.module()
 
 
 class _OneArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor], **kwargs):
-        return self.module(args[0], **kwargs)
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0])
 
 
 class _TwoArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor], **kwargs):
-        return self.module(args[0], args[1], **kwargs)
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1])
 
 
 class _ThreeArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor], **kwargs):
-        return self.module(args[0], args[1], args[2], **kwargs)
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1], args[2])
 
 
 class _FourArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor], **kwargs):
-        return self.module(args[0], args[1], args[2], args[3], **kwargs)
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1], args[2], args[3])
 
 
 class _FiveArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor], **kwargs):
-        return self.module(args[0], args[1], args[2], args[3], args[4], **kwargs)
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1], args[2], args[3], args[4])
 
 
 class _SixArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor], **kwargs):
-        return self.module(args[0], args[1], args[2], args[3], args[4], args[5], **kwargs)
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args[0], args[1], args[2], args[3], args[4], args[5])
 
 
 class _SevenArgCaller(_Caller):
-    def forward(self, args: List[torch.Tensor], **kwargs):
+    def forward(self, args: List[torch.Tensor]):
         return self.module(
-            args[0], args[1], args[2], args[3], args[4], args[5], args[6], **kwargs
+            args[0], args[1], args[2], args[3], args[4], args[5], args[6]
         )
 
 
@@ -417,8 +416,8 @@ class _Wrapper(torch.nn.Module):
         self.module = CALL_DISPATCHERS[descriptor.num_operands - 1](module)
         self.descriptor = descriptor
 
-    def forward(self, args: List[torch.Tensor], **kwargs):
-        return self.module(args, **kwargs)
+    def forward(self, args: List[torch.Tensor]):
+        return self.module(args)
 
 
 def _tensor_product_cuda(
